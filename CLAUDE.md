@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SpoolStation is a filament management system for Bambu Lab 3D printers, based on [SpoolEase](https://github.com/yanshay/SpoolEase). The original SpoolEase source code is in `spoolease_sources/`. See `SPOOLSTATION_PLAN.md` for the roadmap of planned modifications.
+SpoolBuddy is a filament management system for Bambu Lab 3D printers, based on [SpoolEase](https://github.com/yanshay/SpoolEase). The original SpoolEase source code is in `spoolease_sources/`. See `SPOOLBUDDY_PLAN.md` for the roadmap of planned modifications.
 
 The system provides:
 - NFC-based spool identification (NTAG, Mifare Classic, Bambu Lab RFID tags)

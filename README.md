@@ -1,4 +1,4 @@
-# SpoolStation
+# SpoolBuddy
 
 A smart filament management system for Bambu Lab 3D printers.
 
@@ -14,13 +14,13 @@ Based on [SpoolEase](https://github.com/yanshay/SpoolEase) by yanshay.
 
 ## Architecture
 
-SpoolStation uses a server + device architecture:
+SpoolBuddy uses a server + device architecture:
 
 - **Server** - Rust backend (Axum) with SQLite database, serving web UI and handling MQTT
 - **Web UI** - Preact + TailwindCSS, works on desktop, tablet, and device display
 - **Device** - Raspberry Pi Zero 2 W with NFC reader (PN5180) and scale (HX711)
 
-See [SPOOLSTATION_PLAN.md](SPOOLSTATION_PLAN.md) for detailed architecture and roadmap.
+See [SPOOLBUDDY_PLAN.md](SPOOLBUDDY_PLAN.md) for detailed architecture and roadmap.
 
 ## Quick Start
 
@@ -61,7 +61,7 @@ Built files go to `web/dist/`, served by the Rust server.
 ## Project Structure
 
 ```
-spoolstation/
+spoolbuddy/
 ├── server/           # Rust backend (Axum)
 │   ├── src/
 │   │   ├── main.rs
@@ -103,7 +103,7 @@ WS     /ws/ui               - UI WebSocket (live updates)
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `BIND_ADDRESS` | `0.0.0.0:3000` | Server bind address |
-| `DATABASE_URL` | `sqlite:spoolstation.db?mode=rwc` | SQLite database path |
+| `DATABASE_URL` | `sqlite:spoolbuddy.db?mode=rwc` | SQLite database path |
 | `STATIC_DIR` | `../web/dist` | Static files directory |
 
 ## License

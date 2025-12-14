@@ -15,7 +15,7 @@ impl Config {
         Self {
             bind_address: std::env::var("BIND_ADDRESS").unwrap_or_else(|_| "0.0.0.0:3000".into()),
             database_url: std::env::var("DATABASE_URL")
-                .unwrap_or_else(|_| "sqlite:spoolstation.db?mode=rwc".into()),
+                .unwrap_or_else(|_| "sqlite:spoolbuddy.db?mode=rwc".into()),
             static_dir: std::env::var("STATIC_DIR").unwrap_or_else(|_| "../web/dist".into()),
         }
     }

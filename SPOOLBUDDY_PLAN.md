@@ -1,4 +1,4 @@
-# SpoolStation - Project Plan
+# SpoolBuddy - Project Plan
 
 > A smart filament management system for Bambu Lab 3D printers.
 > Based on [SpoolEase](https://github.com/yanshay/SpoolEase) by yanshay.
@@ -19,9 +19,9 @@
 
 ## Project Overview
 
-### What is SpoolStation?
+### What is SpoolBuddy?
 
-SpoolStation is a reimagined filament management system that combines:
+SpoolBuddy is a reimagined filament management system that combines:
 - **NFC-based spool identification** - Read/write tags on filament spools
 - **Weight tracking** - Integrated scale for precise filament measurement
 - **Inventory management** - Track all your spools, usage, and K-profiles
@@ -29,14 +29,15 @@ SpoolStation is a reimagined filament management system that combines:
 
 ### Key Differences from SpoolEase
 
-| Aspect | SpoolEase | SpoolStation |
+| Aspect | SpoolEase | SpoolBuddy |
 |--------|-----------|--------------|
 | Architecture | Embedded (ESP32) | Server + Device |
-| Display | 3.5" embedded | 5" via web UI |
+| Display | 3.5" embedded (480×320) | 4.3" HDMI (800×480) |
 | Console + Scale | Separate devices | Combined unit |
 | UI Framework | Slint (embedded) | Web (Preact) |
 | Updates | Firmware flash | Server update |
 | Database | CSV on SD card | SQLite |
+| NFC Reader | PN532 (~5cm range) | PN5180 (~20cm range) |
 
 ### Goals
 
@@ -72,7 +73,7 @@ SpoolStation is a reimagined filament management system that combines:
            │ HTTP/WS      │ WebSocket    │ NFS
            ▼              ▼              ▼
     ┌───────────┐  ┌───────────┐  ┌─────────────────────────────┐
-    │  Browser  │  │  Tablet   │  │     SpoolStation Device     │
+    │  Browser  │  │  Tablet   │  │     SpoolBuddy Device     │
     │           │  │           │  │                             │
     │  Web UI   │  │  Web UI   │  │  ┌─────────────────────┐    │
     │           │  │           │  │  │  Raspberry Pi Zero  │    │
@@ -83,13 +84,13 @@ SpoolStation is a reimagined filament management system that combines:
                                   │  │  UI: Chromium kiosk │    │
                                   │  │                     │    │
                                   │  │  GPIO:              │    │
-                                  │  │  ├── PN532 (SPI)    │    │
+                                  │  │  ├── PN5180 (SPI)   │    │
                                   │  │  └── HX711 (GPIO)   │    │
                                   │  └─────────────────────┘    │
                                   │                             │
                                   │  ┌───────┐ ┌───────┐ ┌───┐  │
                                   │  │Display│ │ NFC   │ │Scale│ │
-                                  │  │ 5"    │ │Reader │ │     │ │
+                                  │  │ 4.3"  │ │PN5180 │ │     │ │
                                   │  └───────┘ └───────┘ └───┘  │
                                   └─────────────────────────────┘
 ```
@@ -120,22 +121,30 @@ Device                          Server
 | Component | Choice | Interface | Notes |
 |-----------|--------|-----------|-------|
 | **SBC** | Raspberry Pi Zero 2 W | - | WiFi, GPIO, low power |
-| **Display** | Waveshare 5" HDMI (Model B) | Mini-HDMI | 800x480, capacitive touch |
-| **NFC Reader** | PN532 module | SPI | Under scale platform |
+| **Display** | Waveshare 4.3" HDMI LCD (B) | Mini-HDMI | 800×480, IPS, capacitive touch |
+| **NFC Reader** | PN5180 module | SPI | Extended range (~20cm), MIFARE Crypto1 support |
 | **Scale** | HX711 + Load Cell | GPIO | Standard load cell setup |
 | **Power** | USB-C 5V/2A | - | Single power input |
+
+### Hardware Sources
+
+| Component | Source | Price | Status |
+|-----------|--------|-------|--------|
+| Display | [Amazon.de](https://www.amazon.de/Waveshare-4-3inch-HDMI-LCD-Capacitive/dp/B07MB9MYYS) | ~€55 | Ordered |
+| NFC Reader | [LaskaKit.cz](https://www.laskakit.cz/en/rfid-ctecka-s-vestavenou-antenou-nfc-rf-pn5180-iso15693-cteni-i-zapis/) | €10.23 | Ordered |
 
 ### GPIO Pin Allocation
 
 ```
 Raspberry Pi Zero 2 W GPIO:
 
-PN532 (SPI):
+PN5180 (SPI):
   - MOSI: GPIO 10 (Pin 19)
   - MISO: GPIO 9 (Pin 21)
   - SCLK: GPIO 11 (Pin 23)
-  - CS:   GPIO 8 (Pin 24)
-  - IRQ:  GPIO 25 (Pin 22) [optional]
+  - NSS:  GPIO 8 (Pin 24)
+  - BUSY: GPIO 25 (Pin 22)
+  - RST:  GPIO 24 (Pin 18)
 
 HX711 (Scale):
   - DT:   GPIO 5 (Pin 29)
@@ -149,9 +158,10 @@ Display:
 ### Physical Design
 
 - Combined Console + Scale in single case
-- NFC antenna positioned under scale platform center
+- NFC antenna (PN5180) positioned under scale platform center
 - Spool sits on platform, center hole aligns with NFC reader
-- 5" display angled for visibility
+- Extended NFC range (~20cm) enables reading Bambu Lab tags inside spool core
+- 4.3" display angled for visibility
 - Single USB-C power input
 
 ---
@@ -202,19 +212,19 @@ Display:
 **Shared with device:**
 - Same codebase serves all clients
 - Responsive design (desktop, tablet, device)
-- Device-specific views (e.g., simplified for 5" screen)
+- Device-specific views (e.g., simplified for 4.3" screen)
 
 ### 3. Device Service (Python)
 
 **Responsibilities:**
-- Read NFC tags (PN532 via SPI)
+- Read NFC tags (PN5180 via SPI)
 - Read scale weight (HX711)
 - Send data to server via WebSocket
 - Receive commands (write NFC, tare scale)
 - Local caching if server offline
 
 **Libraries:**
-- `py532lib` or `pn532pi` - PN532 NFC
+- `spidev` + custom PN5180 driver - PN5180 NFC
 - `hx711` - HX711 scale ADC
 - `websockets` - WebSocket client
 - `RPi.GPIO` or `gpiozero` - GPIO access
@@ -223,7 +233,7 @@ Display:
 ```
 device-service/
 ├── main.py           # Entry point, main loop
-├── nfc_reader.py     # PN532 interface
+├── nfc_reader.py     # PN5180 interface
 ├── scale.py          # HX711 interface
 ├── websocket.py      # Server communication
 ├── config.py         # Configuration
@@ -248,10 +258,10 @@ device-service/
 **NFS Root Setup:**
 ```
 Server exports:
-  /srv/spoolstation/rootfs  →  Device mounts as /
+  /srv/spoolbuddy/rootfs  →  Device mounts as /
 
 Device /etc/fstab (in initramfs):
-  server:/srv/spoolstation/rootfs / nfs defaults 0 0
+  server:/srv/spoolbuddy/rootfs / nfs defaults 0 0
 ```
 
 ---
@@ -263,18 +273,18 @@ Device /etc/fstab (in initramfs):
 **Goal:** Basic working system, prove architecture
 
 **Server:**
-- [ ] Project setup (Cargo workspace)
-- [ ] Basic Axum server with REST API
-- [ ] SQLite database schema and migrations
-- [ ] Spool CRUD operations
-- [ ] WebSocket endpoint for devices
-- [ ] Static file serving for web UI
+- [x] Project setup (Cargo workspace)
+- [x] Basic Axum server with REST API
+- [x] SQLite database schema and migrations
+- [x] Spool CRUD operations
+- [x] WebSocket endpoint for devices
+- [x] Static file serving for web UI
 
 **Web UI:**
-- [ ] Extend existing inventory UI
-- [ ] Add spool detail/edit page
-- [ ] Add basic dashboard
-- [ ] WebSocket integration for live updates
+- [x] Inventory page with search/filter
+- [x] Spool detail/edit page
+- [x] Dashboard with stats
+- [x] WebSocket integration for live updates
 
 **Device:**
 - [ ] RPi image with Chromium kiosk
@@ -530,7 +540,7 @@ WS     /ws/ui                   - UI WebSocket (live updates)
 ### Project Structure
 
 ```
-spoolstation/
+spoolbuddy/
 ├── server/
 │   ├── Cargo.toml
 │   ├── src/
@@ -595,7 +605,7 @@ spoolstation/
 │   ├── hardware.md
 │   └── api.md
 │
-├── SPOOLSTATION_PLAN.md  # This file
+├── SPOOLBUDDY_PLAN.md  # This file
 ├── LICENSE               # MIT (same as SpoolEase)
 └── README.md
 ```
@@ -606,7 +616,7 @@ spoolstation/
 
 ### Relationship to SpoolEase
 
-SpoolStation is **based on SpoolEase** but is a separate project with different architecture. We will:
+SpoolBuddy is **based on SpoolEase** but is a separate project with different architecture. We will:
 
 1. **Credit SpoolEase** prominently in README and About page
 2. **Use MIT license** (same as SpoolEase)
@@ -615,7 +625,7 @@ SpoolStation is **based on SpoolEase** but is a separate project with different 
 
 ### What to Watch
 
-| SpoolEase File | SpoolStation Impact | Action |
+| SpoolEase File | SpoolBuddy Impact | Action |
 |----------------|---------------------|--------|
 | `bambu_api.rs` | Direct impact | Copy/adapt changes |
 | `gcode_analysis.rs` | Direct impact | Copy/adapt changes |
@@ -628,7 +638,7 @@ SpoolStation is **based on SpoolEase** but is a separate project with different 
 ### Process
 
 1. **Weekly check** of SpoolEase commits
-2. **Evaluate** relevance to SpoolStation
+2. **Evaluate** relevance to SpoolBuddy
 3. **Document** in changelog what was synced
 4. **Test** thoroughly after any sync
 
@@ -636,12 +646,13 @@ SpoolStation is **based on SpoolEase** but is a separate project with different 
 
 ## Next Steps
 
-1. **Create repository** - `github.com/<user>/spoolstation`
+1. **Create repository** - `github.com/<user>/spoolbuddy`
 2. **Set up project structure** - As defined above
 3. **Start Phase 1** - Foundation/MVP
-4. **Order hardware** - RPi Zero 2 W, display, components
+4. ~~**Order hardware**~~ - ✅ Display and NFC reader ordered
 
 ---
 
 *Document created: December 2024*
+*Last updated: December 2024*
 *Based on SpoolEase by yanshay*

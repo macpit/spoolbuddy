@@ -57,6 +57,7 @@ pub struct Printer {
     pub access_code: Option<String>,
     pub last_seen: Option<i64>,
     pub config: Option<String>,
+    pub auto_connect: Option<bool>,
 }
 
 /// K-Profile record from database

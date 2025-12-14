@@ -1,5 +1,5 @@
 [package]
-name = "spoolstation-server"
+name = "spoolbuddy-server"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -23,6 +23,13 @@ chrono.workspace = true
 # WebSocket
 tokio-tungstenite = "0.26"
 futures-util = "0.3"
+
+# TLS for MQTT (version must match rumqttc's tokio-rustls dependency)
+rustls = { version = "0.22.4", features = ["ring"] }
+rustls-pki-types = "1"
+
+# SSDP discovery
+socket2 = "0.5"
 
 # Error handling
 anyhow = "1"

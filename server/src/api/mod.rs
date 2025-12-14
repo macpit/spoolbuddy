@@ -1,6 +1,7 @@
 mod spools;
 mod printers;
 pub mod device;
+mod discovery;
 
 use std::sync::Arc;
 
@@ -14,4 +15,5 @@ pub fn router() -> Router<Arc<AppState>> {
         .nest("/spools", spools::router())
         .nest("/printers", printers::router())
         .nest("/device", device::router())
+        .nest("/discovery", discovery::router())
 }

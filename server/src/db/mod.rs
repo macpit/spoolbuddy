@@ -20,6 +20,12 @@ pub async fn migrate(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         .execute(pool)
         .await?;
 
+    // Add auto_connect column to existing printers table if it doesn't exist
+    sqlx::query("ALTER TABLE printers ADD COLUMN auto_connect INTEGER DEFAULT 0")
+        .execute(pool)
+        .await
+        .ok(); // Ignore error if column already exists
+
     tracing::info!("Database migrations complete");
     Ok(())
 }
@@ -60,7 +66,8 @@ CREATE TABLE IF NOT EXISTS printers (
     ip_address TEXT,
     access_code TEXT,
     last_seen INTEGER,
-    config TEXT
+    config TEXT,
+    auto_connect INTEGER DEFAULT 0
 );
 
 -- K-Profiles table
