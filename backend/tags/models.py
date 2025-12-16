@@ -12,6 +12,7 @@ class TagType(str, Enum):
     BAMBULAB = "Bambu Lab"
     OPENPRINTTAG = "OpenPrintTag"
     OPENSPOOL = "OpenSpool"
+    OPENTAG3D = "OpenTag3D"
     UNKNOWN = "Unknown"
 
 
@@ -97,6 +98,7 @@ class TagReadResult(BaseModel):
     bambulab_data: Optional[BambuLabTagData] = None
     openprinttag_data: Optional[OpenPrintTagData] = None
     openspool_data: Optional[OpenSpoolTagData] = None
+    opentag3d_data: Optional[dict] = None  # Uses OpenTag3DTagData from opentag3d module
 
     # Raw data
     ndef_message: Optional[bytes] = None  # Raw NDEF for NTAG

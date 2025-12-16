@@ -5,6 +5,7 @@ Supports:
 - Bambu Lab tags (Mifare Classic 1K)
 - OpenPrintTag tags (NTAG with NDEF CBOR)
 - OpenSpool tags (NTAG with NDEF JSON)
+- OpenTag3D tags (NTAG with NDEF binary)
 """
 
 from .models import (
@@ -19,6 +20,7 @@ from .spoolease_format import SpoolEaseDecoder, SpoolEaseEncoder
 from .bambulab import BambuLabDecoder
 from .openprinttag import OpenPrintTagDecoder
 from .openspool import OpenSpoolDecoder
+from .opentag3d import OpenTag3DDecoder, OpenTag3DTagData
 from .decoder import TagDecoder
 
 __all__ = [
@@ -28,10 +30,12 @@ __all__ = [
     "BambuLabTagData",
     "OpenPrintTagData",
     "OpenSpoolTagData",
+    "OpenTag3DTagData",
     "SpoolEaseDecoder",
     "SpoolEaseEncoder",
     "BambuLabDecoder",
     "OpenPrintTagDecoder",
     "OpenSpoolDecoder",
+    "OpenTag3DDecoder",
     "TagDecoder",
 ]

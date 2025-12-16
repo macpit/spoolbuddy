@@ -14,6 +14,7 @@ from .spoolease_format import SpoolEaseDecoder
 from .bambulab import BambuLabDecoder
 from .openprinttag import OpenPrintTagDecoder
 from .openspool import OpenSpoolDecoder
+from .opentag3d import OpenTag3DDecoder
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +103,14 @@ class TagDecoder:
                         result.openspool_data = openspool_data
                         return result
 
+            # Check for OpenTag3D (application/opentag3d binary format)
+            if record_type == OpenTag3DDecoder.RECORD_TYPE:
+                opentag3d_data = OpenTag3DDecoder.decode(uid_hex, payload)
+                if opentag3d_data:
+                    result.tag_type = TagType.OPENTAG3D
+                    result.opentag3d_data = opentag3d_data.__dict__
+                    return result
+
             # Check for URL record (SpoolEase)
             if record_type == "U" or record_type.startswith("urn:nfc:wkt:U"):
                 # URL record - payload starts with prefix byte
@@ -175,6 +184,13 @@ class TagDecoder:
         elif result.tag_type == TagType.OPENSPOOL:
             if result.openspool_data:
                 return OpenSpoolDecoder.to_spool(result.openspool_data)
+
+        elif result.tag_type == TagType.OPENTAG3D:
+            if result.opentag3d_data:
+                from .opentag3d import OpenTag3DTagData
+                # Reconstruct the data object from dict
+                tag_data = OpenTag3DTagData(**result.opentag3d_data)
+                return OpenTag3DDecoder.to_spool(tag_data)
 
         return None
 

@@ -4,13 +4,16 @@ ESP32 Firmware OTA Update API Routes
 Handles firmware version checking and OTA binary serving for the SpoolBuddy device.
 """
 
+import hashlib
 import logging
+import re
+import struct
 from pathlib import Path
 from typing import Optional
 from datetime import datetime, timedelta
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -237,11 +240,251 @@ async def get_ota_firmware(version: Optional[str] = None):
     )
 
 
-@router.post("/upload")
-async def upload_firmware():
+# ESP32 firmware magic bytes and structure
+ESP32_IMAGE_MAGIC = 0xE9
+ESP32_APP_DESC_MAGIC = 0xABCD5432
+ESP32_APP_DESC_OFFSET = 0x20  # App descriptor offset in first segment
+
+
+class FirmwareValidationError(Exception):
+    """Raised when firmware validation fails."""
+    pass
+
+
+def _validate_esp32_firmware(data: bytes) -> dict:
+    """
+    Validate ESP32 firmware binary and extract metadata.
+
+    Args:
+        data: Raw firmware binary data
+
+    Returns:
+        Dict with version, project_name, idf_version, etc.
+
+    Raises:
+        FirmwareValidationError: If validation fails
+    """
+    if len(data) < 256:
+        raise FirmwareValidationError("File too small to be valid firmware")
+
+    # Check ESP32 image magic byte
+    if data[0] != ESP32_IMAGE_MAGIC:
+        raise FirmwareValidationError(
+            f"Invalid ESP32 magic byte: expected 0x{ESP32_IMAGE_MAGIC:02X}, "
+            f"got 0x{data[0]:02X}"
+        )
+
+    # ESP32 image header structure (simplified):
+    # 0x00: magic (1 byte) = 0xE9
+    # 0x01: segment count (1 byte)
+    # 0x02: SPI mode (1 byte)
+    # 0x03: SPI speed/size (1 byte)
+    # 0x04-0x07: entry point (4 bytes)
+    # 0x08-0x17: segment info
+    # 0x18: hash appended (1 byte)
+    # ...
+
+    # The app descriptor is located at a fixed offset in the .rodata section
+    # For most ESP-IDF apps, it's at offset 0x20 in the first segment
+    # Look for the app descriptor magic
+
+    app_desc_offset = None
+    # Search for app descriptor magic in first 64KB
+    search_range = min(len(data), 65536)
+    for offset in range(0, search_range - 256, 4):
+        if len(data) >= offset + 4:
+            magic = struct.unpack_from("<I", data, offset)[0]
+            if magic == ESP32_APP_DESC_MAGIC:
+                app_desc_offset = offset
+                break
+
+    if app_desc_offset is None:
+        # Firmware is valid but doesn't have standard app descriptor
+        # This can happen with custom builds
+        logger.warning("No ESP32 app descriptor found, using filename for version")
+        return {
+            "valid": True,
+            "has_descriptor": False,
+        }
+
+    # Parse app descriptor (esp_app_desc_t structure):
+    # 0x00: magic (4 bytes) = 0xABCD5432
+    # 0x04: secure_version (4 bytes)
+    # 0x08: reserv1 (8 bytes)
+    # 0x10: version (32 bytes, null-terminated string)
+    # 0x30: project_name (32 bytes, null-terminated string)
+    # 0x50: time (16 bytes, null-terminated string)
+    # 0x60: date (16 bytes, null-terminated string)
+    # 0x70: idf_ver (32 bytes, null-terminated string)
+    # 0x90: app_elf_sha256 (32 bytes)
+
+    try:
+        def read_str(offset: int, length: int) -> str:
+            raw = data[offset:offset + length]
+            null_idx = raw.find(b'\x00')
+            if null_idx >= 0:
+                raw = raw[:null_idx]
+            return raw.decode('utf-8', errors='replace').strip()
+
+        version = read_str(app_desc_offset + 0x10, 32)
+        project_name = read_str(app_desc_offset + 0x30, 32)
+        compile_time = read_str(app_desc_offset + 0x50, 16)
+        compile_date = read_str(app_desc_offset + 0x60, 16)
+        idf_version = read_str(app_desc_offset + 0x70, 32)
+
+        # Validate version format (should be semver-like)
+        if not version or not re.match(r'^[\d\w\.\-]+$', version):
+            raise FirmwareValidationError(f"Invalid version string: {version!r}")
+
+        return {
+            "valid": True,
+            "has_descriptor": True,
+            "version": version,
+            "project_name": project_name,
+            "compile_time": compile_time,
+            "compile_date": compile_date,
+            "idf_version": idf_version,
+        }
+
+    except struct.error as e:
+        raise FirmwareValidationError(f"Failed to parse app descriptor: {e}")
+
+
+class FirmwareUploadResponse(BaseModel):
+    success: bool
+    message: str
+    version: Optional[str] = None
+    filename: Optional[str] = None
+    size: Optional[int] = None
+    checksum: Optional[str] = None
+
+
+@router.post("/upload", response_model=FirmwareUploadResponse)
+async def upload_firmware(
+    file: UploadFile = File(...),
+    version: Optional[str] = Form(None),
+):
     """
     Upload a new firmware binary.
 
-    TODO: Implement firmware upload with validation.
+    Validates the firmware binary and saves it to the releases directory.
+
+    Args:
+        file: The firmware binary file (.bin)
+        version: Optional version override (extracted from binary if not provided)
+
+    Returns:
+        Upload result with version and filename
     """
-    raise HTTPException(status_code=501, detail="Firmware upload not yet implemented")
+    # Validate file extension
+    if not file.filename or not file.filename.endswith(".bin"):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file type. Must be a .bin file"
+        )
+
+    # Read file content
+    try:
+        content = await file.read()
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to read file: {e}"
+        )
+
+    # Validate firmware
+    try:
+        metadata = _validate_esp32_firmware(content)
+    except FirmwareValidationError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid firmware: {e}"
+        )
+
+    # Determine version
+    if version:
+        firmware_version = version
+    elif metadata.get("version"):
+        firmware_version = metadata["version"]
+    else:
+        # Try to extract from filename
+        match = re.search(r'(\d+\.\d+\.\d+)', file.filename)
+        if match:
+            firmware_version = match.group(1)
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Could not determine firmware version. Please provide version parameter."
+            )
+
+    # Clean version string
+    firmware_version = firmware_version.lstrip("v")
+
+    # Ensure releases directory exists
+    FIRMWARE_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Generate filename and checksum
+    checksum = hashlib.sha256(content).hexdigest()[:16]
+    filename = f"spoolbuddy-{firmware_version}.bin"
+    filepath = FIRMWARE_DIR / filename
+
+    # Check for existing file with same version
+    if filepath.exists():
+        existing_checksum = hashlib.sha256(filepath.read_bytes()).hexdigest()[:16]
+        if existing_checksum == checksum:
+            return FirmwareUploadResponse(
+                success=True,
+                message=f"Firmware {firmware_version} already exists (identical)",
+                version=firmware_version,
+                filename=filename,
+                size=len(content),
+                checksum=checksum,
+            )
+        else:
+            # Different file with same version - rename old one
+            backup_name = f"spoolbuddy-{firmware_version}.{existing_checksum}.bin.bak"
+            filepath.rename(FIRMWARE_DIR / backup_name)
+            logger.info(f"Backed up existing firmware to {backup_name}")
+
+    # Save firmware
+    try:
+        filepath.write_bytes(content)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to save firmware: {e}"
+        )
+
+    logger.info(f"Uploaded firmware {firmware_version}: {filename} ({len(content)} bytes)")
+
+    return FirmwareUploadResponse(
+        success=True,
+        message=f"Firmware {firmware_version} uploaded successfully",
+        version=firmware_version,
+        filename=filename,
+        size=len(content),
+        checksum=checksum,
+    )
+
+
+@router.delete("/{version}")
+async def delete_firmware(version: str):
+    """
+    Delete a firmware version.
+
+    Args:
+        version: Version to delete (e.g., "1.0.0")
+    """
+    version = version.lstrip("v")
+    filename = f"spoolbuddy-{version}.bin"
+    filepath = FIRMWARE_DIR / filename
+
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail=f"Version {version} not found")
+
+    try:
+        filepath.unlink()
+        logger.info(f"Deleted firmware {version}")
+        return {"success": True, "message": f"Firmware {version} deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete: {e}")
