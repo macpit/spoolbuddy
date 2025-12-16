@@ -11,6 +11,7 @@ class TagType(str, Enum):
     SPOOLEASE_V2 = "SpoolEaseV2"
     BAMBULAB = "Bambu Lab"
     OPENPRINTTAG = "OpenPrintTag"
+    OPENSPOOL = "OpenSpool"
     UNKNOWN = "Unknown"
 
 
@@ -69,6 +70,21 @@ class OpenPrintTagData(BaseModel):
     empty_weight: Optional[int] = None  # Empty spool weight
 
 
+class OpenSpoolTagData(BaseModel):
+    """Parsed data from an OpenSpool tag.
+
+    OpenSpool uses JSON in NDEF MIME records (application/json).
+    Format: {"protocol": "openspool", "version": "1.0", "type": "PLA", ...}
+    """
+    tag_id: str  # Base64-encoded UID
+    version: str = "1.0"  # Protocol version
+    material_type: Optional[str] = None  # e.g., "PLA", "PETG"
+    color_hex: Optional[str] = None  # RGB hex without alpha (e.g., "FFAABB")
+    brand: Optional[str] = None
+    min_temp: Optional[int] = None  # Minimum print temperature
+    max_temp: Optional[int] = None  # Maximum print temperature
+
+
 class TagReadResult(BaseModel):
     """Result of reading an NFC tag."""
     uid: str  # Hex-encoded UID
@@ -80,6 +96,7 @@ class TagReadResult(BaseModel):
     spoolease_data: Optional[SpoolEaseTagData] = None
     bambulab_data: Optional[BambuLabTagData] = None
     openprinttag_data: Optional[OpenPrintTagData] = None
+    openspool_data: Optional[OpenSpoolTagData] = None
 
     # Raw data
     ndef_message: Optional[bytes] = None  # Raw NDEF for NTAG

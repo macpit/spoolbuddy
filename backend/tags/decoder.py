@@ -13,6 +13,7 @@ from .models import (
 from .spoolease_format import SpoolEaseDecoder
 from .bambulab import BambuLabDecoder
 from .openprinttag import OpenPrintTagDecoder
+from .openspool import OpenSpoolDecoder
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +93,15 @@ class TagDecoder:
                     result.openprinttag_data = openprinttag_data
                     return result
 
+            # Check for OpenSpool (application/json with protocol: openspool)
+            if record_type == OpenSpoolDecoder.RECORD_TYPE:
+                if OpenSpoolDecoder.can_decode_payload(payload):
+                    openspool_data = OpenSpoolDecoder.decode(uid_hex, payload)
+                    if openspool_data:
+                        result.tag_type = TagType.OPENSPOOL
+                        result.openspool_data = openspool_data
+                        return result
+
             # Check for URL record (SpoolEase)
             if record_type == "U" or record_type.startswith("urn:nfc:wkt:U"):
                 # URL record - payload starts with prefix byte
@@ -161,6 +171,10 @@ class TagDecoder:
         elif result.tag_type == TagType.OPENPRINTTAG:
             if result.openprinttag_data:
                 return OpenPrintTagDecoder.to_spool(result.openprinttag_data)
+
+        elif result.tag_type == TagType.OPENSPOOL:
+            if result.openspool_data:
+                return OpenSpoolDecoder.to_spool(result.openspool_data)
 
         return None
 

@@ -52,3 +52,7 @@ Cargo.lock
 
 # Misc artifacts
 =*
+
+# Claude code
+CLAUDE.md
+SPOOLBUDDY_PLAN.md
