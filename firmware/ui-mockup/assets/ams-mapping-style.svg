@@ -1,0 +1,41 @@
+<svg width="120" height="60" viewBox="0 0 120 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- AMS Unit Container - BambuStudio style -->
+  <rect x="1" y="1" width="118" height="58" rx="6" fill="#2D2D2D" stroke="#3D3D3D"/>
+
+  <!-- Top bar / header area -->
+  <rect x="1" y="1" width="118" height="14" rx="6" fill="#3D3D3D"/>
+  <rect x="1" y="9" width="118" height="6" fill="#3D3D3D"/>
+
+  <!-- Ventilation lines -->
+  <line x1="20" y1="5" x2="40" y2="5" stroke="#505050" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="20" y1="9" x2="40" y2="9" stroke="#505050" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="50" y1="5" x2="70" y2="5" stroke="#505050" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="50" y1="9" x2="70" y2="9" stroke="#505050" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="80" y1="5" x2="100" y2="5" stroke="#505050" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="80" y1="9" x2="100" y2="9" stroke="#505050" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- 4 Spool Slots -->
+  <g id="slot1">
+    <rect x="6" y="18" width="24" height="36" rx="3" fill="#1A1A1A"/>
+    <rect class="spool-color" x="9" y="21" width="18" height="30" rx="2" fill="var(--slot1-color, #F44336)"/>
+    <ellipse cx="18" cy="36" rx="4" ry="8" fill="#1A1A1A"/>
+  </g>
+
+  <g id="slot2">
+    <rect x="34" y="18" width="24" height="36" rx="3" fill="#1A1A1A"/>
+    <rect class="spool-color" x="37" y="21" width="18" height="30" rx="2" fill="var(--slot2-color, #4CAF50)"/>
+    <ellipse cx="46" cy="36" rx="4" ry="8" fill="#1A1A1A"/>
+  </g>
+
+  <g id="slot3">
+    <rect x="62" y="18" width="24" height="36" rx="3" fill="#1A1A1A"/>
+    <rect class="spool-color" x="65" y="21" width="18" height="30" rx="2" fill="var(--slot3-color, #2196F3)"/>
+    <ellipse cx="74" cy="36" rx="4" ry="8" fill="#1A1A1A"/>
+  </g>
+
+  <g id="slot4">
+    <rect x="90" y="18" width="24" height="36" rx="3" fill="#1A1A1A"/>
+    <rect class="spool-color" x="93" y="21" width="18" height="30" rx="2" fill="var(--slot4-color, #FFEB3B)"/>
+    <ellipse cx="102" cy="36" rx="4" ry="8" fill="#1A1A1A"/>
+  </g>
+</svg>

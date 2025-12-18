@@ -1,2 +1,0 @@
-cargo:rerun-if-env-changed=ESP_LOG
-cargo:rustc-check-cfg=cfg(host_is_windows)

@@ -1,7 +1,5 @@
-# Override ESP32 settings for simulator - build for host
-[build]
-# No target specified = build for host
+# Override parent config to use host target for simulator
+# (Parent sets xtensa-esp32s3-none-elf which doesn't work for desktop)
 
-# Override parent's rustflags that include -nostartfiles (which breaks host builds)
-[target.x86_64-unknown-linux-gnu]
-rustflags = []
+[build]
+target = "x86_64-unknown-linux-gnu"

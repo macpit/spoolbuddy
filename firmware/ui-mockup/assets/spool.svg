@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 32">
+  <defs>
+    <linearGradient id="spool-side" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:rgba(255,255,255,0.1)"/>
+      <stop offset="50%" style="stop-color:rgba(255,255,255,0)"/>
+      <stop offset="100%" style="stop-color:rgba(0,0,0,0.2)"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Spool flanges (top and bottom) -->
+  <ellipse cx="12" cy="4" rx="11" ry="3" fill="#333" stroke="#222" stroke-width="0.5"/>
+  <ellipse cx="12" cy="28" rx="11" ry="3" fill="#2a2a2a" stroke="#222" stroke-width="0.5"/>
+
+  <!-- Filament body - this gets colored -->
+  <rect class="spool-color" x="1" y="4" width="22" height="24" fill="currentColor"/>
+
+  <!-- 3D effect overlay -->
+  <rect x="1" y="4" width="22" height="24" fill="url(#spool-side)"/>
+
+  <!-- Center hole -->
+  <ellipse cx="12" cy="16" rx="4" ry="8" fill="#1a1a1a"/>
+  <ellipse cx="12" cy="16" rx="3" ry="6" fill="#252525"/>
+
+  <!-- Top flange overlay -->
+  <ellipse cx="12" cy="4" rx="11" ry="3" fill="transparent" stroke="#444" stroke-width="0.3"/>
+
+  <!-- Highlight -->
+  <ellipse cx="8" cy="14" rx="1.5" ry="4" fill="rgba(255,255,255,0.08)"/>
+</svg>

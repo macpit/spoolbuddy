@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Spool side view -->
+  <!-- Outer flanges -->
+  <path d="M8 8 L8 56 C8 58 10 60 12 60 L52 60 C54 60 56 58 56 56 L56 8 C56 6 54 4 52 4 L12 4 C10 4 8 6 8 8"
+        stroke="#3D3D3D" stroke-width="2" fill="none"/>
+
+  <!-- Inner spool core (this is where filament color goes) -->
+  <rect x="14" y="10" width="36" height="44" rx="2" fill="#FILAMENT_COLOR" class="filament-fill"/>
+
+  <!-- Center hole -->
+  <ellipse cx="32" cy="32" rx="8" ry="20" fill="#1A1A1A"/>
+
+  <!-- Spool texture lines -->
+  <line x1="14" y1="20" x2="50" y2="20" stroke="#2D2D2D" stroke-width="1" opacity="0.5"/>
+  <line x1="14" y1="32" x2="50" y2="32" stroke="#2D2D2D" stroke-width="1" opacity="0.5"/>
+  <line x1="14" y1="44" x2="50" y2="44" stroke="#2D2D2D" stroke-width="1" opacity="0.5"/>
+</svg>

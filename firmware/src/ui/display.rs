@@ -10,7 +10,7 @@
 //! - LCD_VSYNC: GPIO41
 //! - LCD_HSYNC: GPIO39
 //! - LCD_PCLK:  GPIO42
-//! - LCD_R0-R4: GPIO45, 48, 47, 21, 14
+//! - LCD_R0-R4: GPIO45, 48, 47, 21, 14  (directly active bits)
 //! - LCD_G0-G5: GPIO9, 46, 3, 8, 18, 17
 //! - LCD_B0-B4: GPIO10, 11, 12, 13, 14
 //! - LCD_BL:    GPIO2 (Backlight PWM)
@@ -23,6 +23,7 @@ use embedded_graphics::prelude::*;
 use log::info;
 
 /// Display timing configuration for 800x480 LCD
+#[derive(Clone)]
 pub struct DisplayTiming {
     pub h_res: u16,
     pub v_res: u16,
@@ -37,7 +38,7 @@ pub struct DisplayTiming {
 
 impl Default for DisplayTiming {
     fn default() -> Self {
-        // Standard timing for 800x480 @ 60Hz
+        // Timing for Waveshare 4.3" 800x480 LCD
         Self {
             h_res: 800,
             v_res: 480,
@@ -47,7 +48,7 @@ impl Default for DisplayTiming {
             v_sync_width: 4,
             v_back_porch: 8,
             v_front_porch: 8,
-            pclk_hz: 21_000_000, // 21MHz pixel clock
+            pclk_hz: 16_000_000, // 16MHz pixel clock (conservative)
         }
     }
 }
@@ -55,9 +56,24 @@ impl Default for DisplayTiming {
 /// Framebuffer size in bytes (RGB565 = 2 bytes per pixel)
 pub const FRAMEBUFFER_SIZE: usize = (DISPLAY_WIDTH as usize) * (DISPLAY_HEIGHT as usize) * 2;
 
-/// Display driver for the RGB parallel interface
+/// Framebuffer for the display - allocated in PSRAM
+/// Must be aligned to 4 bytes for DMA
+#[repr(C, align(4))]
+pub struct FrameBuffer {
+    pub data: [u8; FRAMEBUFFER_SIZE],
+}
+
+impl FrameBuffer {
+    pub const fn new() -> Self {
+        Self {
+            data: [0u8; FRAMEBUFFER_SIZE],
+        }
+    }
+}
+
+/// Display driver wrapper for embedded-graphics compatibility
 pub struct Display {
-    /// Double-buffered framebuffer pointers
+    /// Pointer to framebuffer (in PSRAM)
     framebuffer: &'static mut [u8],
     /// Current backlight brightness (0-100)
     brightness: u8,
@@ -70,7 +86,7 @@ impl Display {
     ///
     /// # Safety
     /// The framebuffer must be allocated in PSRAM and persist for the lifetime of the display.
-    pub unsafe fn new(framebuffer: &'static mut [u8]) -> Result<Self, DisplayError> {
+    pub fn new(framebuffer: &'static mut [u8]) -> Result<Self, DisplayError> {
         if framebuffer.len() < FRAMEBUFFER_SIZE {
             return Err(DisplayError::BufferOverflow);
         }
@@ -82,37 +98,16 @@ impl Display {
         })
     }
 
-    /// Initialize the display hardware
-    pub fn init(&mut self) -> Result<(), DisplayError> {
-        info!("Initializing RGB parallel display (800x480)");
-
-        // TODO: Configure GPIO pins for RGB parallel interface
-        // This requires esp-hal LCD peripheral support
-
-        // Configure timing
-        let _timing = DisplayTiming::default();
-
-        // TODO: Initialize LCD peripheral with timing config
-
-        // Initialize backlight to default brightness
-        self.set_backlight(self.brightness)?;
-
-        // Clear framebuffer to black
-        self.clear_buffer();
-
+    /// Mark display as initialized (called after hardware setup)
+    pub fn set_initialized(&mut self) {
         self.initialized = true;
-        info!("Display initialized");
-
-        Ok(())
+        info!("Display marked as initialized");
     }
 
     /// Set backlight brightness (0-100)
     pub fn set_backlight(&mut self, brightness: u8) -> Result<(), DisplayError> {
         self.brightness = brightness.min(100);
-
-        // TODO: Configure PWM on GPIO2 for backlight control
-        // PWM duty = brightness * 255 / 100
-
+        // Note: Actual PWM control is done in main.rs with the LEDC peripheral
         info!("Backlight set to {}%", self.brightness);
         Ok(())
     }
@@ -141,6 +136,11 @@ impl Display {
         &mut self.framebuffer[..FRAMEBUFFER_SIZE]
     }
 
+    /// Get an immutable reference to the framebuffer
+    pub fn framebuffer(&self) -> &[u8] {
+        &self.framebuffer[..FRAMEBUFFER_SIZE]
+    }
+
     /// Set a pixel in the framebuffer
     #[inline]
     pub fn set_pixel(&mut self, x: u32, y: u32, color: Rgb565) {
@@ -150,20 +150,6 @@ impl Display {
             self.framebuffer[offset] = color_bytes[0];
             self.framebuffer[offset + 1] = color_bytes[1];
         }
-    }
-
-    /// Flush the framebuffer to the display
-    ///
-    /// For RGB parallel displays, this triggers a DMA transfer.
-    pub fn flush(&mut self) -> Result<(), DisplayError> {
-        if !self.initialized {
-            return Err(DisplayError::InitFailed);
-        }
-
-        // TODO: Trigger DMA transfer to LCD peripheral
-        // The ESP32-S3 LCD peripheral can continuously refresh from the framebuffer
-
-        Ok(())
     }
 
     /// Check if display is initialized
@@ -205,10 +191,6 @@ impl OriginDimensions for Display {
 pub struct DisplayConfig {
     /// Initial backlight brightness (0-100)
     pub brightness: u8,
-    /// Whether to use double buffering
-    pub double_buffer: bool,
-    /// Whether to invert colors
-    pub invert_colors: bool,
     /// Pixel clock frequency in Hz
     pub pclk_hz: u32,
 }
@@ -217,30 +199,59 @@ impl Default for DisplayConfig {
     fn default() -> Self {
         Self {
             brightness: 80,
-            double_buffer: true,
-            invert_colors: false,
-            pclk_hz: 21_000_000,
+            pclk_hz: 16_000_000,
         }
     }
 }
 
-/// GPIO pin assignments for the display
+/// GPIO pin assignments for the Waveshare ESP32-S3-Touch-LCD-4.3
+/// Source: https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4.3
 pub mod pins {
+    // Control signals
     /// Data Enable pin
-    pub const DE: u8 = 40;
+    pub const DE: u8 = 5;
     /// Vertical Sync pin
-    pub const VSYNC: u8 = 41;
+    pub const VSYNC: u8 = 3;
     /// Horizontal Sync pin
-    pub const HSYNC: u8 = 39;
+    pub const HSYNC: u8 = 46;
     /// Pixel Clock pin
-    pub const PCLK: u8 = 42;
-    /// Backlight control pin (PWM)
-    pub const BACKLIGHT: u8 = 2;
+    pub const PCLK: u8 = 7;
 
-    /// Red data pins (R0-R4, 5 bits)
-    pub const RED: [u8; 5] = [45, 48, 47, 21, 14];
-    /// Green data pins (G0-G5, 6 bits)
-    pub const GREEN: [u8; 6] = [9, 46, 3, 8, 18, 17];
-    /// Blue data pins (B0-B4, 5 bits)
-    pub const BLUE: [u8; 5] = [10, 11, 12, 13, 14];
+    // RGB565: 5 bits red, 6 bits green, 5 bits blue = 16 bits total
+    // The Waveshare board uses 16-bit parallel data
+
+    /// Red data pins (R3-R7)
+    pub const R3: u8 = 1;
+    pub const R4: u8 = 2;
+    pub const R5: u8 = 42;
+    pub const R6: u8 = 41;
+    pub const R7: u8 = 40;
+
+    /// Green data pins (G2-G7)
+    pub const G2: u8 = 39;
+    pub const G3: u8 = 0;
+    pub const G4: u8 = 45;
+    pub const G5: u8 = 48;
+    pub const G6: u8 = 47;
+    pub const G7: u8 = 21;
+
+    /// Blue data pins (B3-B7)
+    pub const B3: u8 = 14;
+    pub const B4: u8 = 38;
+    pub const B5: u8 = 18;
+    pub const B6: u8 = 17;
+    pub const B7: u8 = 10;
+
+    // Touch interface
+    pub const TOUCH_IRQ: u8 = 4;
+    pub const TOUCH_SDA: u8 = 8;
+    pub const TOUCH_SCL: u8 = 9;
+
+    // CH422G IO Expander (I2C address 0x24)
+    // Controls: TP_RST (EXIO1), LCD_BL (EXIO2), LCD_RST (EXIO3), SD_CS (EXIO4)
+    pub const IO_EXPANDER_ADDR: u8 = 0x24;
+    pub const EXIO_TP_RST: u8 = 1;
+    pub const EXIO_LCD_BL: u8 = 2;
+    pub const EXIO_LCD_RST: u8 = 3;
+    pub const EXIO_SD_CS: u8 = 4;
 }

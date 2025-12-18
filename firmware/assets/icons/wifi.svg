@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <!-- WiFi icon - full signal -->
+  <!-- Arc 3 (outer) -->
+  <path d="M2 9 C6 5 10 3 12 3 C14 3 18 5 22 9"
+        stroke="#00ADB5" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <!-- Arc 2 (middle) -->
+  <path d="M5 12 C7.5 9.5 10 8 12 8 C14 8 16.5 9.5 19 12"
+        stroke="#00ADB5" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <!-- Arc 1 (inner) -->
+  <path d="M8 15 C9.5 13.5 10.5 13 12 13 C13.5 13 14.5 13.5 16 15"
+        stroke="#00ADB5" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <!-- Dot -->
+  <circle cx="12" cy="19" r="2" fill="#00ADB5"/>
+</svg>

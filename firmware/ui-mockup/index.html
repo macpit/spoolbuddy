@@ -1,0 +1,2438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SpoolBuddy UI Mockup (7" 800x480)</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #0a0a0a;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    h1 {
+      color: #fff;
+      margin-bottom: 10px;
+      font-size: 18px;
+    }
+
+    .nav {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .nav button {
+      padding: 8px 16px;
+      border: 1px solid #555;
+      background: #222;
+      color: #888;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .nav button.active {
+      background: #333;
+      color: #fff;
+      border-color: #666;
+    }
+
+    .display {
+      width: 800px;
+      height: 480px;
+      background: #1A1A1A;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+
+    .screen {
+      display: none;
+      width: 100%;
+      height: 100%;
+      flex-direction: column;
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    :root {
+      --accent: #00FF00;
+      --bg: #1A1A1A;
+      --card: #2D2D2D;
+      --border: #3D3D3D;
+      --text: #FFFFFF;
+      --text-secondary: #B0B0B0;
+      --text-muted: #707070;
+    }
+
+    /* Status bar */
+    .status-bar {
+      height: 44px;
+      background: #101010;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .status-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-left .logo {
+      height: 24px;
+      width: auto;
+    }
+
+    .status-left .back-btn {
+      padding: 4px;
+      margin: 0;
+    }
+
+    .status-bar .title {
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .printer-selector {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--card);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+    }
+
+    .printer-selector:hover {
+      background: #3D3D3D;
+    }
+
+    .printer-status {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #666;
+    }
+
+    .printer-status.connected {
+      background: var(--accent);
+    }
+
+    .printer-status.disconnected {
+      background: #F44336;
+    }
+
+    .printer-name {
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .dropdown-icon {
+      color: var(--text-muted);
+    }
+
+    .status-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status-bar .time {
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    /* Notification bell */
+    .notification-bell {
+      position: relative;
+      cursor: pointer;
+    }
+
+    .notification-bell svg {
+      width: 20px;
+      height: 20px;
+      fill: var(--text-secondary);
+    }
+
+    .notification-bell:hover svg {
+      fill: var(--text);
+    }
+
+    .notification-bell .badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      min-width: 14px;
+      height: 14px;
+      background: #F44336;
+      border-radius: 7px;
+      font-size: 9px;
+      font-weight: 700;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 3px;
+    }
+
+    /* Alert badge on printer selector */
+    .printer-selector .alert-badge {
+      width: 8px;
+      height: 8px;
+      background: #FF9800;
+      border-radius: 50%;
+      margin-left: -4px;
+    }
+
+    .content {
+      flex: 1;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow: visible;
+    }
+
+    .back-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--accent);
+      font-size: 16px;
+      cursor: pointer;
+      background: none;
+      border: none;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border-radius: 8px;
+      border: none;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    .btn-secondary {
+      background: var(--card);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    /* ==================== HOME SCREEN ==================== */
+    .home-layout {
+      display: flex;
+      gap: 12px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .home-left {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .home-right {
+      width: 180px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* AMS Panel - uses full height */
+    .ams-panel {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 10px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: visible;
+    }
+
+    .ams-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      flex-shrink: 0;
+    }
+
+    .ams-panel-header h3 {
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .ams-panel-header .more-btn {
+      color: var(--accent);
+      font-size: 12px;
+      cursor: pointer;
+      background: none;
+      border: none;
+    }
+
+    /* AMS Grid - 12 column layout */
+    .ams-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      grid-template-rows: auto auto;
+      column-gap: 5px;
+      row-gap: 8px;
+      flex: 1;
+      overflow: visible;
+    }
+
+    /* AMS Unit Card - Bambu style */
+    .ams-unit {
+      background: var(--card);
+      border-radius: 8px;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      cursor: pointer;
+      border: 2px solid #404040;
+      transition: border-color 0.2s;
+      min-width: 0;
+    }
+
+    .ams-unit:hover {
+      border-color: #505050;
+    }
+
+    .ams-unit.active {
+      border-color: var(--accent);
+    }
+
+    /* AMS with 4 slots - span 4 columns (1/3 width) */
+    .ams-unit.ams-4slot {
+      grid-row: 1;
+      grid-column: span 4;
+    }
+
+    /* AMS 4-slot in row 2 - same size as row 1 AMS units */
+    .ams-unit.ams-4slot.row2 {
+      grid-row: 2;
+      grid-column: span 4;
+    }
+
+    /* Single slot units - row 2, span 2 columns (remaining 8 cols / 4 units) */
+    .ams-unit.single-slot {
+      grid-row: 2;
+      grid-column: span 2;
+    }
+
+    .ams-unit-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+      flex-shrink: 0;
+      gap: 4px;
+    }
+
+    .ams-unit-header-left {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      flex-shrink: 0;
+    }
+
+    .ams-unit-label {
+      font-size: 10px;
+      color: var(--text);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .ams-unit-nozzle {
+      font-size: 8px;
+      background: var(--accent);
+      color: var(--bg);
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-weight: 700;
+    }
+
+    .ams-unit-header-right {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 9px;
+      color: var(--text-secondary);
+      flex-wrap: nowrap;
+      overflow: hidden;
+    }
+
+    .ams-unit-header-right .stat {
+      display: flex;
+      align-items: center;
+      gap: 1px;
+      white-space: nowrap;
+    }
+
+    .ams-unit-header-right .stat svg {
+      width: 10px;
+      height: 10px;
+      flex-shrink: 0;
+    }
+
+    /* AMS Spool Row - Bambu style 3D spools */
+    .ams-unit-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      position: relative;
+    }
+
+    /* AMS Housing background */
+    .ams-housing {
+      position: relative;
+      background: linear-gradient(180deg, #3D3D3D 0%, #2A2A2A 15%, #1A1A1A 100%);
+      border-radius: 5px;
+      padding: 4px 3px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    /* Ventilation lines on top */
+    .ams-housing::before {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 15%;
+      right: 15%;
+      height: 6px;
+      background: repeating-linear-gradient(
+        90deg,
+        transparent 0px,
+        transparent 6px,
+        #505050 6px,
+        #505050 14px,
+        transparent 14px,
+        transparent 20px
+      );
+      opacity: 0.5;
+    }
+
+    .spool-row {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      padding-top: 6px;
+      position: relative;
+      flex: 1;
+    }
+
+    /* Perspective spool arrangement - overlapping like Bambu UI */
+    .spool-row.perspective {
+      padding-left: 6px;
+    }
+
+    .spool-row.perspective .spool-3d {
+      margin-left: -6px;
+    }
+
+    .spool-row.perspective .spool-3d:first-child {
+      margin-left: 0;
+      z-index: 4;
+    }
+
+    .spool-row.perspective .spool-3d:nth-child(2) {
+      z-index: 3;
+    }
+
+    .spool-row.perspective .spool-3d:nth-child(3) {
+      z-index: 2;
+    }
+
+    .spool-row.perspective .spool-3d:nth-child(4) {
+      z-index: 1;
+    }
+
+    /* Individual spool - Bambu style */
+    .spool-3d {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+
+    .spool-3d .material-label {
+      font-size: 9px;
+      color: var(--text-secondary);
+      margin-bottom: 2px;
+      white-space: nowrap;
+      text-align: center;
+      font-weight: 500;
+    }
+
+    .spool-3d .spool-visual {
+      width: 32px;
+      height: 42px;
+      position: relative;
+    }
+
+    .spool-3d .spool-visual img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    /* Color tint overlay - covers filament body area of spool_clean.svg */
+    .spool-3d .spool-visual .color-tint {
+      position: absolute;
+      top: 12%;
+      left: 27%;
+      right: 22%;
+      bottom: 12%;
+      border-radius: 2px;
+      opacity: 0.85;
+    }
+
+    /* Fill percentage text */
+    .spool-3d .fill-pct {
+      font-size: 9px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+      font-weight: 500;
+    }
+
+    .spool-3d .slot-id {
+      font-size: 10px;
+      color: var(--text);
+      margin-top: 2px;
+      background: rgba(0,0,0,0.6);
+      padding: 2px 6px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      font-weight: 600;
+      position: relative;
+      z-index: 10;
+    }
+
+    .spool-3d .slot-id.active {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    .spool-3d.empty .spool-visual {
+      opacity: 0.3;
+    }
+
+    /* Single spool units (HT, External) */
+    .ams-unit.single-slot .spool-row {
+      justify-content: center;
+      padding-top: 4px;
+    }
+
+    .ams-unit.single-slot .spool-3d .spool-visual {
+      width: 32px;
+      height: 42px;
+    }
+
+    /* External spool - front view ring style like Bambu */
+    .ext-spool {
+      width: 34px;
+      height: 34px;
+      position: relative;
+    }
+
+    .ext-spool svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* External units need visible border */
+    .ams-unit.external {
+      border: 1px solid var(--border);
+    }
+
+    /* Footer with humidity and temp icons */
+    .ams-unit-footer {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 6px;
+      font-size: 10px;
+      color: var(--text-secondary);
+      flex-shrink: 0;
+    }
+
+    .ams-unit-footer .stat {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .ams-unit-footer .stat svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .icon-humidity { fill: #4FC3F7; }
+    .icon-temp { fill: #FFB74D; }
+
+    /* Right side with action buttons and logo */
+    .home-right {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Action buttons - 2x2 grid filling width */
+    .action-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .action-btn {
+      background: var(--card);
+      border-radius: 10px;
+      aspect-ratio: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+      background: #3D3D3D;
+      border-color: var(--border);
+    }
+
+    .action-btn .icon {
+      width: 28px;
+      height: 28px;
+    }
+
+    .action-btn .label {
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    /* SpoolBuddy logo section */
+    .logo-section {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px;
+      margin-top: auto;
+    }
+
+    .logo-section img {
+      max-width: 100%;
+      max-height: 40px;
+      object-fit: contain;
+    }
+
+    /* Bottom bar */
+    .bottom-bar {
+      background: #101010;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    /* Scale section */
+    .bottom-bar .scale-section {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .bottom-bar .weight {
+      display: flex;
+      align-items: baseline;
+      gap: 2px;
+    }
+
+    .bottom-bar .weight .value {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .bottom-bar .weight .unit {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .bottom-bar .scale-status {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--text-muted);
+      font-size: 10px;
+    }
+
+    .bottom-bar .scale-status .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    .bottom-bar .tare-btn {
+      padding: 4px 10px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-secondary);
+      font-size: 10px;
+      cursor: pointer;
+    }
+
+    .bottom-bar .tare-btn:hover {
+      background: #3D3D3D;
+    }
+
+    /* Current spool on scale */
+    .bottom-bar .spool-section {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .bottom-bar .spool-section .spool-color {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .bottom-bar .spool-section .spool-info {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .bottom-bar .spool-section .material {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .bottom-bar .spool-section .color-name {
+      font-size: 9px;
+      color: var(--text-muted);
+    }
+
+    /* NFC section */
+    .bottom-bar .nfc-section {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .bottom-bar .nfc-section svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .bottom-bar .nfc-section .nfc-status {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .bottom-bar .nfc-section .nfc-label {
+      font-size: 9px;
+      color: var(--text-muted);
+    }
+
+    .bottom-bar .nfc-section .nfc-value {
+      font-size: 10px;
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .bottom-bar .nfc-section.ready svg {
+      fill: var(--accent);
+    }
+
+    .bottom-bar .nfc-section.scanning svg {
+      fill: #FFB74D;
+      animation: nfc-pulse 1s ease-in-out infinite;
+    }
+
+    @keyframes nfc-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Last scanned spool */
+    .bottom-bar .last-scan-section {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .bottom-bar .last-scan-section .scan-icon {
+      width: 16px;
+      height: 16px;
+      fill: var(--text-muted);
+    }
+
+    .bottom-bar .last-scan-section .scan-info {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .bottom-bar .last-scan-section .scan-label {
+      font-size: 9px;
+      color: var(--text-muted);
+    }
+
+    .bottom-bar .last-scan-section .scan-value {
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
+
+    .bottom-bar .last-scan-section .scan-time {
+      font-size: 9px;
+      color: var(--text-muted);
+      margin-left: 8px;
+    }
+
+    /* ==================== AMS DETAIL SCREEN ==================== */
+    .ams-detail-scroll {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .ams-detail-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .ams-card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .ams-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .ams-card-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ams-card-title h4 {
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .ams-card-title .type-badge {
+      font-size: 10px;
+      background: var(--bg);
+      color: var(--text-muted);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .ams-card-title .nozzle-badge {
+      font-size: 10px;
+      background: var(--accent);
+      color: var(--bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .ams-card-stats {
+      display: flex;
+      gap: 16px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .slot-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .slot-detail {
+      flex: 1;
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 8px;
+      display: flex;
+      gap: 8px;
+      cursor: pointer;
+      border: 2px solid transparent;
+    }
+
+    .slot-detail:hover {
+      border-color: var(--border);
+    }
+
+    .slot-detail.active {
+      border-color: var(--accent);
+    }
+
+    .slot-spool {
+      width: 36px;
+      height: 48px;
+      flex-shrink: 0;
+    }
+
+    .slot-spool svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .slot-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .slot-info .material {
+      font-size: 12px;
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .slot-info .color-name {
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
+
+    .slot-info .stats {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+      font-size: 9px;
+      color: var(--text-muted);
+    }
+
+    .fill-level {
+      width: 100%;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      margin-top: 4px;
+    }
+
+    .fill-level .bar {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+    }
+
+    /* Other screens */
+    .scan-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .scan-animation {
+      width: 140px;
+      height: 140px;
+      position: relative;
+      margin-bottom: 24px;
+    }
+
+    .scan-animation .ring {
+      position: absolute;
+      border: 3px solid var(--accent);
+      border-radius: 50%;
+      animation: pulse 2s ease-out infinite;
+    }
+
+    .scan-animation .ring:nth-child(1) { width: 50px; height: 50px; top: 45px; left: 45px; }
+    .scan-animation .ring:nth-child(2) { width: 90px; height: 90px; top: 25px; left: 25px; animation-delay: 0.4s; }
+    .scan-animation .ring:nth-child(3) { width: 130px; height: 130px; top: 5px; left: 5px; animation-delay: 0.8s; }
+    .scan-animation .center { position: absolute; width: 36px; height: 36px; top: 52px; left: 52px; background: var(--accent); border-radius: 8px; }
+
+    @keyframes pulse {
+      0% { transform: scale(0.8); opacity: 1; }
+      100% { transform: scale(1.2); opacity: 0; }
+    }
+
+    .scan-text { font-size: 22px; color: var(--text); margin-bottom: 8px; }
+    .scan-hint { font-size: 14px; color: var(--text-muted); }
+
+    .settings-list { display: flex; flex-direction: column; gap: 2px; }
+    .settings-item {
+      display: flex;
+      align-items: center;
+      padding: 14px 16px;
+      background: var(--card);
+      cursor: pointer;
+    }
+    .settings-item:first-child { border-radius: 10px 10px 0 0; }
+    .settings-item:last-child { border-radius: 0 0 10px 10px; }
+    .settings-item:hover { background: #3D3D3D; }
+    .settings-item .icon { width: 22px; height: 22px; margin-right: 14px; fill: var(--accent); }
+    .settings-item .label { flex: 1; font-size: 15px; color: var(--text); }
+    .settings-item .value { font-size: 13px; color: var(--text-muted); margin-right: 8px; }
+    .settings-item .chevron { margin-left: auto; flex-shrink: 0; }
+    .settings-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 16px 0 8px 4px;
+    }
+    .settings-section-title:first-child { margin-top: 0; }
+
+    /* ==================== SCAN RESULT SCREEN ==================== */
+    .scan-result-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      gap: 16px;
+    }
+
+    .scan-success-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      background: rgba(0, 255, 0, 0.1);
+      border: 1px solid rgba(0, 255, 0, 0.3);
+      border-radius: 10px;
+    }
+
+    .scan-success-header .check-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--accent);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .scan-success-header .check-icon svg {
+      width: 20px;
+      height: 20px;
+      fill: var(--bg);
+    }
+
+    .scan-success-header .success-text {
+      flex: 1;
+    }
+
+    .scan-success-header .success-text h3 {
+      color: var(--accent);
+      font-size: 16px;
+      margin-bottom: 2px;
+    }
+
+    .scan-success-header .success-text p {
+      color: var(--text-secondary);
+      font-size: 12px;
+    }
+
+    .spool-result-card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      gap: 16px;
+    }
+
+    .spool-result-visual {
+      width: 80px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .spool-result-visual .big-spool {
+      width: 70px;
+      height: 90px;
+      position: relative;
+    }
+
+    .spool-result-visual .big-spool img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .spool-result-visual .big-spool .color-tint {
+      position: absolute;
+      top: 12%;
+      left: 27%;
+      right: 22%;
+      bottom: 12%;
+      border-radius: 3px;
+      opacity: 0.85;
+    }
+
+    .spool-result-visual .weight-badge {
+      background: var(--bg);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .spool-result-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .spool-result-info .material-name {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .spool-result-info .color-name {
+      font-size: 14px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .spool-result-info .color-name .color-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .spool-result-info .brand {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .spool-result-details {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .spool-result-details .detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .spool-result-details .detail-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .spool-result-details .detail-value {
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .spool-result-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: auto;
+    }
+
+    .spool-result-actions .btn {
+      flex: 1;
+    }
+
+    .assign-slot-section {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .assign-slot-section h4 {
+      font-size: 13px;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+
+    .slot-options {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .slot-option {
+      padding: 8px 14px;
+      background: var(--bg);
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .slot-option:hover {
+      border-color: #505050;
+      color: var(--text);
+    }
+
+    .slot-option.selected {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(0, 255, 0, 0.1);
+    }
+
+    .slot-option.occupied {
+      opacity: 0.5;
+    }
+
+    .slot-option .slot-current {
+      font-size: 9px;
+      color: var(--text-muted);
+      display: block;
+    }
+
+    /* ==================== SPOOL DETAIL SCREEN ==================== */
+    .spool-detail-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      gap: 16px;
+      overflow-y: auto;
+    }
+
+    .spool-detail-header {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .spool-detail-visual {
+      width: 100px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .spool-detail-visual .big-spool {
+      width: 90px;
+      height: 115px;
+      position: relative;
+    }
+
+    .spool-detail-visual .big-spool img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .spool-detail-visual .big-spool .color-tint {
+      position: absolute;
+      top: 12%;
+      left: 27%;
+      right: 22%;
+      bottom: 12%;
+      border-radius: 3px;
+      opacity: 0.85;
+    }
+
+    .spool-detail-visual .slot-badge {
+      background: var(--accent);
+      color: var(--bg);
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .spool-detail-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .spool-detail-info .material-name {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .spool-detail-info .color-name {
+      font-size: 14px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .spool-detail-info .color-name .color-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .spool-detail-info .brand {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .spool-detail-info .weight-display {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .spool-detail-info .weight-display .value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .spool-detail-info .weight-display .unit {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .spool-detail-info .weight-display .pct {
+      font-size: 14px;
+      color: var(--accent);
+      margin-left: 8px;
+    }
+
+    .spool-detail-section {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .spool-detail-section h4 {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .detail-grid .detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .detail-grid .detail-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .detail-grid .detail-value {
+      font-size: 14px;
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .spool-detail-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: auto;
+      padding-top: 8px;
+    }
+
+    .spool-detail-actions .btn {
+      flex: 1;
+    }
+
+    .btn-danger {
+      background: #F44336;
+      color: white;
+    }
+
+    .btn-sm {
+      padding: 8px 16px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <h1>SpoolBuddy UI Mockup - ELECROW 7" (800x480)</h1>
+
+  <div class="nav">
+    <button class="active" onclick="showScreen('home')">Home</button>
+    <button onclick="showScreen('ams-detail')">AMS Detail</button>
+    <button onclick="showScreen('scan')">NFC Scan</button>
+    <button onclick="showScreen('scan-result')">Scan Result</button>
+    <button onclick="showScreen('spool-detail')">Spool Detail</button>
+    <button onclick="showScreen('settings')">Settings</button>
+  </div>
+
+  <div class="display">
+
+    <!-- HOME SCREEN -->
+    <div id="home" class="screen active">
+      <div class="status-bar">
+        <div class="status-left">
+          <img class="logo" src="assets/spoolbuddy_logo_dark_transp.png" alt="SpoolBuddy">
+        </div>
+        <div class="printer-selector">
+          <span class="printer-status connected"></span>
+          <span class="printer-name">X1C-Studio</span>
+          <span class="alert-badge"></span>
+          <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div class="status-right">
+          <div class="notification-bell">
+            <svg viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg>
+            <span class="badge">3</span>
+          </div>
+          <svg width="18" height="18" viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z" fill="#00FF00"/></svg>
+          <span class="time">14:23</span>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="home-layout">
+          <div class="home-left">
+            <div class="ams-panel">
+              <div class="ams-panel-header">
+                <h3>AMS Units</h3>
+                <button class="more-btn" onclick="showScreen('ams-detail')">Details ></button>
+              </div>
+              <div class="ams-grid">
+                <!-- AMS A - 4 slot unit -->
+                <div class="ams-unit ams-4slot active" onclick="showScreen('ams-detail')">
+                  <div class="ams-unit-header">
+                    <div class="ams-unit-header-left">
+                      <span class="ams-unit-label">AMS A</span>
+                      <span class="ams-unit-nozzle">L</span>
+                    </div>
+                    <div class="ams-unit-header-right">
+                      <span class="stat"><svg class="icon-humidity" viewBox="0 0 24 24"><path d="M12 2c-5.33 4.55-8 8.48-8 11.8 0 4.98 3.8 8.2 8 8.2s8-3.22 8-8.2c0-3.32-2.67-7.25-8-11.8z"/></svg>19%</span>
+                      <span class="stat"><svg class="icon-temp" viewBox="0 0 24 24"><path d="M15 13V5c0-1.66-1.34-3-3-3S9 3.34 9 5v8c-1.21.91-2 2.37-2 4 0 2.76 2.24 5 5 5s5-2.24 5-5c0-1.63-.79-3.09-2-4zm-4-8c0-.55.45-1 1-1s1 .45 1 1v3h-2V5z"/></svg>25°C</span>
+                    </div>
+                  </div>
+                  <div class="ams-unit-body">
+                    <div class="ams-housing">
+                      <div class="spool-row perspective">
+                        <div class="spool-3d">
+                          <span class="material-label">PLA</span>
+                          <div class="spool-visual">
+                            <img src="assets/spool_clean.svg" alt="">
+                            <div class="color-tint" style="background: #F5C518;"></div>
+                          </div>
+                          <span class="slot-id active">A1</span>
+                          <span class="fill-pct">85%</span>
+                        </div>
+                        <div class="spool-3d">
+                          <span class="material-label">PETG</span>
+                          <div class="spool-visual">
+                            <img src="assets/spool_clean.svg" alt="">
+                            <div class="color-tint" style="background: #333;"></div>
+                          </div>
+                          <span class="slot-id">A2</span>
+                          <span class="fill-pct">62%</span>
+                        </div>
+                        <div class="spool-3d">
+                          <span class="material-label">PETG</span>
+                          <div class="spool-visual">
+                            <img src="assets/spool_clean.svg" alt="">
+                            <div class="color-tint" style="background: #FF9800;"></div>
+                          </div>
+                          <span class="slot-id">A3</span>
+                          <span class="fill-pct">45%</span>
+                        </div>
+                        <div class="spool-3d">
+                          <span class="material-label">PLA</span>
+                          <div class="spool-visual">
+                            <img src="assets/spool_clean.svg" alt="">
+                            <div class="color-tint" style="background: #9E9E9E;"></div>
+                          </div>
+                          <span class="slot-id">A4</span>
+                          <span class="fill-pct">90%</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- AMS B - 4 slot unit with 1 empty -->
+                <div class="ams-unit ams-4slot" onclick="showScreen('ams-detail')">
+                  <div class="ams-unit-header">
+                    <div class="ams-unit-header-left">
+                      <span class="ams-unit-label">AMS B</span>
+                      <span class="ams-unit-nozzle">L</span>
+                    </div>
+                    <div class="ams-unit-header-right">
+                      <span class="stat"><svg class="icon-humidity" viewBox="0 0 24 24"><path d="M12 2c-5.33 4.55-8 8.48-8 11.8 0 4.98 3.8 8.2 8 8.2s8-3.22 8-8.2c0-3.32-2.67-7.25-8-11.8z"/></svg>24%</span>
+                      <span class="stat"><svg class="icon-temp" viewBox="0 0 24 24"><path d="M15 13V5c0-1.66-1.34-3-3-3S9 3.34 9 5v8c-1.21.91-2 2.37-2 4 0 2.76 2.24 5 5 5s5-2.24 5-5c0-1.63-.79-3.09-2-4zm-4-8c0-.55.45-1 1-1s1 .45 1 1v3h-2V5z"/></svg>24°C</span>
+                    </div>
+                  </div>
+                  <div class="ams-unit-body">
+                    <div class="ams-housing">
+                      <div class="spool-row perspective">
+                        <div class="spool-3d">
+                          <span class="material-label">PLA</span>
+                          <div class="spool-visual">
+                            <img src="assets/spool_clean.svg" alt="">
+                            <div class="color-tint" style="background: #E91E63;"></div>
+                          </div>
+                          <span class="slot-id">B1</span>
+                          <span class="fill-pct">72%</span>
+                        </div>
+                        <div class="spool-3d">
+                          <span class="material-label">PLA</span>
+                          <div class="spool-visual">
+                            <img src="assets/spool_clean.svg" alt="">
+                            <div class="color-tint" style="background: #2196F3;"></div>
+                          </div>
+                          <span class="slot-id">B2</span>
+                          <span class="fill-pct">55%</span>
+                        </div>
+                        <div class="spool-3d">
+                          <span class="material-label">PETG</span>
+                          <div class="spool-visual">
+                            <img src="assets/spool_clean.svg" alt="">
+                            <div class="color-tint" style="background: #4CAF50;"></div>
+                          </div>
+                          <span class="slot-id">B3</span>
+                          <span class="fill-pct">33%</span>
+                        </div>
+                        <div class="spool-3d empty">
+                          <span class="material-label">--</span>
+                          <div class="spool-visual">
+                            <img src="assets/spool_clean.svg" alt="">
+                          </div>
+                          <span class="slot-id">B4</span>
+                          <span class="fill-pct">--</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- AMS C - 4 slot unit with 2 empty -->
+                <div class="ams-unit ams-4slot" onclick="showScreen('ams-detail')">
+                  <div class="ams-unit-header">
+                    <div class="ams-unit-header-left">
+                      <span class="ams-unit-label">AMS C</span>
+                      <span class="ams-unit-nozzle">R</span>
+                    </div>
+                    <div class="ams-unit-header-right">
+                      <span class="stat"><svg class="icon-humidity" viewBox="0 0 24 24"><path d="M12 2c-5.33 4.55-8 8.48-8 11.8 0 4.98 3.8 8.2 8 8.2s8-3.22 8-8.2c0-3.32-2.67-7.25-8-11.8z"/></svg>31%</span>
+                      <span class="stat"><svg class="icon-temp" viewBox="0 0 24 24"><path d="M15 13V5c0-1.66-1.34-3-3-3S9 3.34 9 5v8c-1.21.91-2 2.37-2 4 0 2.76 2.24 5 5 5s5-2.24 5-5c0-1.63-.79-3.09-2-4zm-4-8c0-.55.45-1 1-1s1 .45 1 1v3h-2V5z"/></svg>23°C</span>
+                    </div>
+                  </div>
+                  <div class="ams-unit-body">
+                    <div class="ams-housing">
+                      <div class="spool-row perspective">
+                        <div class="spool-3d">
+                          <span class="material-label">ASA</span>
+                          <div class="spool-visual">
+                            <img src="assets/spool_clean.svg" alt="">
+                            <div class="color-tint" style="background: #FFF;"></div>
+                          </div>
+                          <span class="slot-id">C1</span>
+                          <span class="fill-pct">95%</span>
+                        </div>
+                        <div class="spool-3d">
+                          <span class="material-label">ASA</span>
+                          <div class="spool-visual">
+                            <img src="assets/spool_clean.svg" alt="">
+                            <div class="color-tint" style="background: #212121;"></div>
+                          </div>
+                          <span class="slot-id">C2</span>
+                          <span class="fill-pct">88%</span>
+                        </div>
+                        <div class="spool-3d empty">
+                          <span class="material-label">--</span>
+                          <div class="spool-visual">
+                            <img src="assets/spool_clean.svg" alt="">
+                          </div>
+                          <span class="slot-id">C3</span>
+                          <span class="fill-pct">--</span>
+                        </div>
+                        <div class="spool-3d empty">
+                          <span class="material-label">--</span>
+                          <div class="spool-visual">
+                            <img src="assets/spool_clean.svg" alt="">
+                          </div>
+                          <span class="slot-id">C4</span>
+                          <span class="fill-pct">--</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- AMS D - 4 slot unit (row 2) -->
+                <div class="ams-unit ams-4slot row2" onclick="showScreen('ams-detail')">
+                  <div class="ams-unit-header">
+                    <div class="ams-unit-header-left">
+                      <span class="ams-unit-label">AMS D</span>
+                      <span class="ams-unit-nozzle">R</span>
+                    </div>
+                    <div class="ams-unit-header-right">
+                      <span class="stat"><svg class="icon-humidity" viewBox="0 0 24 24"><path d="M12 2c-5.33 4.55-8 8.48-8 11.8 0 4.98 3.8 8.2 8 8.2s8-3.22 8-8.2c0-3.32-2.67-7.25-8-11.8z"/></svg>28%</span>
+                      <span class="stat"><svg class="icon-temp" viewBox="0 0 24 24"><path d="M15 13V5c0-1.66-1.34-3-3-3S9 3.34 9 5v8c-1.21.91-2 2.37-2 4 0 2.76 2.24 5 5 5s5-2.24 5-5c0-1.63-.79-3.09-2-4zm-4-8c0-.55.45-1 1-1s1 .45 1 1v3h-2V5z"/></svg>22°C</span>
+                    </div>
+                  </div>
+                  <div class="ams-unit-body">
+                    <div class="ams-housing">
+                      <div class="spool-row perspective">
+                        <div class="spool-3d">
+                          <span class="material-label">PLA</span>
+                          <div class="spool-visual">
+                            <img src="assets/spool_clean.svg" alt="">
+                            <div class="color-tint" style="background: #00BCD4;"></div>
+                          </div>
+                          <span class="slot-id">D1</span>
+                          <span class="fill-pct">100%</span>
+                        </div>
+                        <div class="spool-3d">
+                          <span class="material-label">PLA</span>
+                          <div class="spool-visual">
+                            <img src="assets/spool_clean.svg" alt="">
+                            <div class="color-tint" style="background: #FF5722;"></div>
+                          </div>
+                          <span class="slot-id">D2</span>
+                          <span class="fill-pct">67%</span>
+                        </div>
+                        <div class="spool-3d empty">
+                          <span class="material-label">--</span>
+                          <div class="spool-visual">
+                            <img src="assets/spool_clean.svg" alt="">
+                          </div>
+                          <span class="slot-id">D3</span>
+                          <span class="fill-pct">--</span>
+                        </div>
+                        <div class="spool-3d empty">
+                          <span class="material-label">--</span>
+                          <div class="spool-visual">
+                            <img src="assets/spool_clean.svg" alt="">
+                          </div>
+                          <span class="slot-id">D4</span>
+                          <span class="fill-pct">--</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- HT-A - Single slot high-temp -->
+                <div class="ams-unit single-slot" onclick="showScreen('ams-detail')">
+                  <div class="ams-unit-header">
+                    <div class="ams-unit-header-left">
+                      <span class="ams-unit-label">HT-A</span>
+                      <span class="ams-unit-nozzle">L</span>
+                    </div>
+                    <div class="ams-unit-header-right">
+                      <span class="stat"><svg class="icon-humidity" viewBox="0 0 24 24"><path d="M12 2c-5.33 4.55-8 8.48-8 11.8 0 4.98 3.8 8.2 8 8.2s8-3.22 8-8.2c0-3.32-2.67-7.25-8-11.8z"/></svg>42%</span>
+                      <span class="stat"><svg class="icon-temp" viewBox="0 0 24 24"><path d="M15 13V5c0-1.66-1.34-3-3-3S9 3.34 9 5v8c-1.21.91-2 2.37-2 4 0 2.76 2.24 5 5 5s5-2.24 5-5c0-1.63-.79-3.09-2-4zm-4-8c0-.55.45-1 1-1s1 .45 1 1v3h-2V5z"/></svg>65°C</span>
+                    </div>
+                  </div>
+                  <div class="ams-unit-body">
+                    <div class="ams-housing">
+                      <div class="spool-row">
+                        <div class="spool-3d">
+                          <span class="material-label">ABS</span>
+                          <div class="spool-visual">
+                            <img src="assets/spool_clean.svg" alt="">
+                            <div class="color-tint" style="background: #673AB7;"></div>
+                          </div>
+                          <span class="slot-id">HT-A</span>
+                          <span class="fill-pct">78%</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- HT-B - Single slot high-temp -->
+                <div class="ams-unit single-slot" onclick="showScreen('ams-detail')">
+                  <div class="ams-unit-header">
+                    <div class="ams-unit-header-left">
+                      <span class="ams-unit-label">HT-B</span>
+                      <span class="ams-unit-nozzle">R</span>
+                    </div>
+                    <div class="ams-unit-header-right">
+                      <span class="stat"><svg class="icon-humidity" viewBox="0 0 24 24"><path d="M12 2c-5.33 4.55-8 8.48-8 11.8 0 4.98 3.8 8.2 8 8.2s8-3.22 8-8.2c0-3.32-2.67-7.25-8-11.8z"/></svg>38%</span>
+                      <span class="stat"><svg class="icon-temp" viewBox="0 0 24 24"><path d="M15 13V5c0-1.66-1.34-3-3-3S9 3.34 9 5v8c-1.21.91-2 2.37-2 4 0 2.76 2.24 5 5 5s5-2.24 5-5c0-1.63-.79-3.09-2-4zm-4-8c0-.55.45-1 1-1s1 .45 1 1v3h-2V5z"/></svg>58°C</span>
+                    </div>
+                  </div>
+                  <div class="ams-unit-body">
+                    <div class="ams-housing">
+                      <div class="spool-row">
+                        <div class="spool-3d">
+                          <span class="material-label">PC</span>
+                          <div class="spool-visual">
+                            <img src="assets/spool_clean.svg" alt="">
+                            <div class="color-tint" style="background: #ECEFF1;"></div>
+                          </div>
+                          <span class="slot-id">HT-B</span>
+                          <span class="fill-pct">52%</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- EXT 1 - External spool -->
+                <div class="ams-unit single-slot external" onclick="showScreen('ams-detail')">
+                  <div class="ams-unit-header">
+                    <div class="ams-unit-header-left">
+                      <span class="ams-unit-label">Ext 1</span>
+                      <span class="ams-unit-nozzle">L</span>
+                    </div>
+                  </div>
+                  <div class="ams-unit-body">
+                    <div class="spool-row">
+                      <div class="spool-3d">
+                        <span class="material-label">TPU</span>
+                        <div class="ext-spool">
+                          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <ellipse cx="20" cy="20" rx="18" ry="18" fill="#607D8B" stroke="#78909C" stroke-width="1.5"/>
+                            <ellipse cx="20" cy="20" rx="7" ry="7" fill="#2D2D2D" stroke="#505050" stroke-width="1"/>
+                          </svg>
+                        </div>
+                        <span class="slot-id">Ext 1</span>
+                        <span class="fill-pct">--</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- EXT 2 - External spool -->
+                <div class="ams-unit single-slot external" onclick="showScreen('ams-detail')">
+                  <div class="ams-unit-header">
+                    <div class="ams-unit-header-left">
+                      <span class="ams-unit-label">Ext 2</span>
+                      <span class="ams-unit-nozzle">R</span>
+                    </div>
+                  </div>
+                  <div class="ams-unit-body">
+                    <div class="spool-row">
+                      <div class="spool-3d">
+                        <span class="material-label">PVA</span>
+                        <div class="ext-spool">
+                          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <ellipse cx="20" cy="20" rx="18" ry="18" fill="#8BC34A" stroke="#9CCC65" stroke-width="1.5"/>
+                            <ellipse cx="20" cy="20" rx="7" ry="7" fill="#2D2D2D" stroke="#505050" stroke-width="1"/>
+                          </svg>
+                        </div>
+                        <span class="slot-id">Ext 2</span>
+                        <span class="fill-pct">--</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <div class="home-right">
+            <div class="action-grid">
+              <div class="action-btn" onclick="showScreen('scan')">
+                <svg class="icon" viewBox="0 0 32 32" fill="#00FF00">
+                  <rect x="4" y="8" width="12" height="12" rx="2" stroke="#00FF00" stroke-width="1.5" fill="none"/>
+                  <rect x="6" y="10" width="3" height="3" fill="#00FF00"/>
+                  <path d="M18 14 C18 10 21 7 25 7" stroke="#00FF00" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+                  <path d="M18 14 C18 18 21 21 25 21" stroke="#00FF00" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+                </svg>
+                <span class="label">Scan</span>
+              </div>
+
+              <div class="action-btn" onclick="showScreen('ams-detail')">
+                <svg class="icon" viewBox="0 0 32 32" fill="none">
+                  <rect x="4" y="8" width="24" height="16" rx="2" stroke="#00FF00" stroke-width="1.5"/>
+                  <rect x="6" y="10" width="4" height="12" rx="1" fill="#F44336"/>
+                  <rect x="11" y="10" width="4" height="12" rx="1" fill="#4CAF50"/>
+                  <rect x="16" y="10" width="4" height="12" rx="1" fill="#2196F3"/>
+                  <rect x="21" y="10" width="4" height="12" rx="1" fill="#FFEB3B"/>
+                </svg>
+                <span class="label">AMS</span>
+              </div>
+
+              <div class="action-btn">
+                <svg class="icon" viewBox="0 0 32 32" fill="none">
+                  <circle cx="16" cy="16" r="10" stroke="#00FF00" stroke-width="1.5"/>
+                  <circle cx="16" cy="16" r="5" stroke="#00FF00" stroke-width="1.5"/>
+                  <circle cx="16" cy="16" r="2" fill="#00FF00"/>
+                  <path d="M16 4v3M16 25v3M4 16h3M25 16h3" stroke="#00FF00" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                <span class="label">Calibrate</span>
+              </div>
+
+              <div class="action-btn" onclick="showScreen('settings')">
+                <svg class="icon" viewBox="0 0 32 32" fill="#00FF00">
+                  <path d="M25.52 17.25c.05-.41.08-.83.08-1.25s-.03-.84-.08-1.25l2.7-2.11c.24-.19.31-.54.16-.81l-2.56-4.43c-.16-.28-.5-.38-.79-.29l-3.19 1.28c-.66-.51-1.37-.93-2.16-1.25l-.48-3.39c-.05-.31-.31-.55-.63-.55h-5.12c-.32 0-.57.24-.63.55l-.48 3.39c-.79.32-1.5.75-2.16 1.25l-3.19-1.28c-.28-.1-.63 0-.79.29l-2.56 4.43c-.16.28-.1.62.16.81l2.7 2.11c-.05.41-.08.83-.08 1.25s.03.84.08 1.25l-2.7 2.11c-.24.19-.31.54-.16.81l2.56 4.43c.16.28.5.38.79.29l3.19-1.28c.66.51 1.37.93 2.16 1.25l.48 3.39c.05.31.31.55.63.55h5.12c.32 0 .57-.24.63-.55l.48-3.39c.79-.32 1.5-.75 2.16-1.25l3.19 1.28c.28.1.63 0 .79-.29l2.56-4.43c.16-.28.1-.62-.16-.81l-2.7-2.11zM16 20.8c-2.65 0-4.8-2.15-4.8-4.8s2.15-4.8 4.8-4.8 4.8 2.15 4.8 4.8-2.15 4.8-4.8 4.8z"/>
+                </svg>
+                <span class="label">Settings</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div class="bottom-bar">
+        <!-- Scale weight and status -->
+        <div class="scale-section">
+          <div class="weight">
+            <span class="value">847.5</span>
+            <span class="unit">g</span>
+          </div>
+          <div class="scale-status">
+            <span class="dot"></span>
+            Ready
+          </div>
+          <button class="tare-btn">TARE</button>
+        </div>
+
+        <!-- Current spool on scale -->
+        <div class="spool-section">
+          <div class="spool-color" style="background: #F5C518;"></div>
+          <div class="spool-info">
+            <span class="material">PLA Basic</span>
+            <span class="color-name">Yellow</span>
+          </div>
+        </div>
+
+        <!-- NFC status -->
+        <div class="nfc-section ready">
+          <svg viewBox="0 0 24 24">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 18H4V4h16v16zM18 6h-5c-1.1 0-2 .9-2 2v2.28c-.6.35-1 .98-1 1.72 0 1.1.9 2 2 2s2-.9 2-2c0-.74-.4-1.38-1-1.72V8h3v8H8V8h2V6H6v12h12V6z"/>
+          </svg>
+          <div class="nfc-status">
+            <span class="nfc-label">NFC</span>
+            <span class="nfc-value">Ready</span>
+          </div>
+        </div>
+
+        <!-- Last scanned spool -->
+        <div class="last-scan-section">
+          <svg class="scan-icon" viewBox="0 0 24 24">
+            <path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
+          </svg>
+          <div class="scan-info">
+            <span class="scan-label">Last scan</span>
+            <span class="scan-value">PETG Black - Bambu</span>
+          </div>
+          <span class="scan-time">2m ago</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AMS DETAIL SCREEN -->
+    <div id="ams-detail" class="screen">
+      <div class="status-bar">
+        <div class="status-left">
+          <button class="back-btn" onclick="showScreen('home')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+          </button>
+          <img class="logo" src="assets/spoolbuddy_logo_dark_transp.png" alt="SpoolBuddy">
+        </div>
+        <div class="printer-selector">
+          <span class="printer-status connected"></span>
+          <span class="printer-name">X1C-Studio</span>
+          <span class="alert-badge"></span>
+          <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div class="status-right">
+          <div class="notification-bell">
+            <svg viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg>
+            <span class="badge">3</span>
+          </div>
+          <span class="time">14:23</span>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="ams-detail-scroll">
+          <div class="ams-detail-grid">
+            <!-- AMS A Detail -->
+            <div class="ams-card">
+              <div class="ams-card-header">
+                <div class="ams-card-title">
+                  <h4>AMS A</h4>
+                  <span class="type-badge">Standard</span>
+                  <span class="nozzle-badge">Left</span>
+                </div>
+                <div class="ams-card-stats">
+                  <span>32%</span>
+                  <span>25°C</span>
+                </div>
+              </div>
+              <div class="slot-row">
+                <div class="slot-detail active" onclick="showScreen('spool-detail')">
+                  <div class="slot-spool">
+                    <svg viewBox="0 0 24 32">
+                      <ellipse cx="12" cy="4" rx="11" ry="3" fill="#333" stroke="#222" stroke-width="0.5"/>
+                      <ellipse cx="12" cy="28" rx="11" ry="3" fill="#2a2a2a" stroke="#222" stroke-width="0.5"/>
+                      <rect x="1" y="4" width="22" height="24" fill="#F44336"/>
+                      <ellipse cx="12" cy="16" rx="4" ry="8" fill="#1a1a1a"/>
+                    </svg>
+                  </div>
+                  <div class="slot-info">
+                    <div class="material">PLA Basic</div>
+                    <div class="color-name">Red</div>
+                    <div class="stats"><span>85%</span><span>K: 0.024</span></div>
+                    <div class="fill-level"><div class="bar" style="width: 85%;"></div></div>
+                  </div>
+                </div>
+                <div class="slot-detail" onclick="showScreen('spool-detail')">
+                  <div class="slot-spool">
+                    <svg viewBox="0 0 24 32">
+                      <ellipse cx="12" cy="4" rx="11" ry="3" fill="#333" stroke="#222" stroke-width="0.5"/>
+                      <ellipse cx="12" cy="28" rx="11" ry="3" fill="#2a2a2a" stroke="#222" stroke-width="0.5"/>
+                      <rect x="1" y="4" width="22" height="24" fill="#4CAF50"/>
+                      <ellipse cx="12" cy="16" rx="4" ry="8" fill="#1a1a1a"/>
+                    </svg>
+                  </div>
+                  <div class="slot-info">
+                    <div class="material">PLA Matte</div>
+                    <div class="color-name">Green</div>
+                    <div class="stats"><span>62%</span><span>K: 0.022</span></div>
+                    <div class="fill-level"><div class="bar" style="width: 62%;"></div></div>
+                  </div>
+                </div>
+                <div class="slot-detail" onclick="showScreen('spool-detail')">
+                  <div class="slot-spool">
+                    <svg viewBox="0 0 24 32">
+                      <ellipse cx="12" cy="4" rx="11" ry="3" fill="#333" stroke="#222" stroke-width="0.5"/>
+                      <ellipse cx="12" cy="28" rx="11" ry="3" fill="#2a2a2a" stroke="#222" stroke-width="0.5"/>
+                      <rect x="1" y="4" width="22" height="24" fill="#2196F3"/>
+                      <ellipse cx="12" cy="16" rx="4" ry="8" fill="#1a1a1a"/>
+                    </svg>
+                  </div>
+                  <div class="slot-info">
+                    <div class="material">PETG HF</div>
+                    <div class="color-name">Blue</div>
+                    <div class="stats"><span>45%</span><span>K: 0.032</span></div>
+                    <div class="fill-level"><div class="bar" style="width: 45%;"></div></div>
+                  </div>
+                </div>
+                <div class="slot-detail" onclick="showScreen('spool-detail')">
+                  <div class="slot-spool">
+                    <svg viewBox="0 0 24 32">
+                      <ellipse cx="12" cy="4" rx="11" ry="3" fill="#333" stroke="#222" stroke-width="0.5"/>
+                      <ellipse cx="12" cy="28" rx="11" ry="3" fill="#2a2a2a" stroke="#222" stroke-width="0.5"/>
+                      <rect x="1" y="4" width="22" height="24" fill="#FFEB3B"/>
+                      <ellipse cx="12" cy="16" rx="4" ry="8" fill="#1a1a1a"/>
+                    </svg>
+                  </div>
+                  <div class="slot-info">
+                    <div class="material">PLA Silk</div>
+                    <div class="color-name">Yellow</div>
+                    <div class="stats"><span>90%</span><span>K: 0.020</span></div>
+                    <div class="fill-level"><div class="bar" style="width: 90%;"></div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- AMS-HT 1 Detail -->
+            <div class="ams-card">
+              <div class="ams-card-header">
+                <div class="ams-card-title">
+                  <h4>AMS-HT 1</h4>
+                  <span class="type-badge">High Temp</span>
+                  <span class="nozzle-badge">Left</span>
+                </div>
+                <div class="ams-card-stats">
+                  <span>65°C</span>
+                  <span style="color: var(--accent);">Heating</span>
+                </div>
+              </div>
+              <div class="slot-row">
+                <div class="slot-detail" style="max-width: 200px;" onclick="showScreen('spool-detail')">
+                  <div class="slot-spool">
+                    <svg viewBox="0 0 24 32">
+                      <ellipse cx="12" cy="4" rx="11" ry="3" fill="#333" stroke="#222" stroke-width="0.5"/>
+                      <ellipse cx="12" cy="28" rx="11" ry="3" fill="#2a2a2a" stroke="#222" stroke-width="0.5"/>
+                      <rect x="1" y="4" width="22" height="24" fill="#673AB7"/>
+                      <ellipse cx="12" cy="16" rx="4" ry="8" fill="#1a1a1a"/>
+                    </svg>
+                  </div>
+                  <div class="slot-info">
+                    <div class="material">ABS</div>
+                    <div class="color-name">Purple</div>
+                    <div class="stats"><span>78%</span><span>K: 0.045</span></div>
+                    <div class="fill-level"><div class="bar" style="width: 78%;"></div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- External 1 Detail -->
+            <div class="ams-card">
+              <div class="ams-card-header">
+                <div class="ams-card-title">
+                  <h4>External 1</h4>
+                  <span class="type-badge">External</span>
+                  <span class="nozzle-badge">Left</span>
+                </div>
+              </div>
+              <div class="slot-row">
+                <div class="slot-detail" style="max-width: 200px;" onclick="showScreen('spool-detail')">
+                  <div class="slot-spool">
+                    <svg viewBox="0 0 24 32">
+                      <ellipse cx="12" cy="4" rx="11" ry="3" fill="#333" stroke="#222" stroke-width="0.5"/>
+                      <ellipse cx="12" cy="28" rx="11" ry="3" fill="#2a2a2a" stroke="#222" stroke-width="0.5"/>
+                      <rect x="1" y="4" width="22" height="24" fill="#CDDC39"/>
+                      <ellipse cx="12" cy="16" rx="4" ry="8" fill="#1a1a1a"/>
+                    </svg>
+                  </div>
+                  <div class="slot-info">
+                    <div class="material">TPU 95A</div>
+                    <div class="color-name">Lime</div>
+                    <div class="stats"><span>92%</span><span>K: 0.12</span></div>
+                    <div class="fill-level"><div class="bar" style="width: 92%;"></div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCAN SCREEN -->
+    <div id="scan" class="screen">
+      <div class="status-bar">
+        <div class="status-left">
+          <button class="back-btn" onclick="showScreen('home')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+          </button>
+          <img class="logo" src="assets/spoolbuddy_logo_dark_transp.png" alt="SpoolBuddy">
+        </div>
+        <div class="printer-selector">
+          <span class="printer-status connected"></span>
+          <span class="printer-name">X1C-Studio</span>
+          <span class="alert-badge"></span>
+          <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div class="status-right">
+          <div class="notification-bell">
+            <svg viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg>
+            <span class="badge">3</span>
+          </div>
+          <span class="time">14:23</span>
+        </div>
+      </div>
+
+      <div class="scan-content">
+        <div class="scan-animation">
+          <div class="ring"></div>
+          <div class="ring"></div>
+          <div class="ring"></div>
+          <div class="center"></div>
+        </div>
+        <div class="scan-text">Scanning...</div>
+        <div class="scan-hint">Place spool on scale to read NFC tag</div>
+      </div>
+
+      <div style="padding: 16px;">
+        <button class="btn btn-secondary" style="width: 100%;" onclick="showScreen('scan-result')">Simulate Scan</button>
+      </div>
+    </div>
+
+    <!-- SCAN RESULT SCREEN -->
+    <div id="scan-result" class="screen">
+      <div class="status-bar">
+        <div class="status-left">
+          <button class="back-btn" onclick="showScreen('scan')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+          </button>
+          <span class="title">Scan Result</span>
+        </div>
+        <div class="status-right">
+          <span class="time">14:23</span>
+        </div>
+      </div>
+
+      <div class="scan-result-content">
+        <!-- Success Header -->
+        <div class="scan-success-header">
+          <div class="check-icon">
+            <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          </div>
+          <div class="success-text">
+            <h3>Spool Detected</h3>
+            <p>Bambu Lab NFC tag read successfully</p>
+          </div>
+        </div>
+
+        <!-- Spool Info Card -->
+        <div class="spool-result-card">
+          <div class="spool-result-visual">
+            <div class="big-spool">
+              <img src="assets/spool_clean.svg" alt="">
+              <div class="color-tint" style="background: #F5C518;"></div>
+            </div>
+            <span class="weight-badge">847g</span>
+          </div>
+          <div class="spool-result-info">
+            <div class="material-name">PLA Basic</div>
+            <div class="color-name">
+              <span class="color-dot" style="background: #F5C518;"></span>
+              Yellow
+            </div>
+            <div class="brand">Bambu Lab</div>
+            <div class="spool-result-details">
+              <div class="detail-item">
+                <span class="detail-label">Nozzle Temp</span>
+                <span class="detail-value">190-220°C</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Bed Temp</span>
+                <span class="detail-value">45-65°C</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Diameter</span>
+                <span class="detail-value">1.75mm</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Tag ID</span>
+                <span class="detail-value">A4B7C912</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Slot Assignment -->
+        <div class="assign-slot-section">
+          <h4>Assign to AMS Slot (Optional)</h4>
+          <div class="slot-options">
+            <div class="slot-option">
+              <span>A1</span>
+              <span class="slot-current">PLA Yellow</span>
+            </div>
+            <div class="slot-option">
+              <span>A2</span>
+              <span class="slot-current">PETG Black</span>
+            </div>
+            <div class="slot-option">
+              <span>A3</span>
+              <span class="slot-current">PETG Orange</span>
+            </div>
+            <div class="slot-option">
+              <span>A4</span>
+              <span class="slot-current">PLA Gray</span>
+            </div>
+            <div class="slot-option selected">
+              <span>B4</span>
+              <span class="slot-current">Empty</span>
+            </div>
+            <div class="slot-option">
+              <span>Ext L</span>
+              <span class="slot-current">External</span>
+            </div>
+            <div class="slot-option">
+              <span>Ext R</span>
+              <span class="slot-current">External</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="spool-result-actions">
+          <button class="btn btn-secondary" onclick="showScreen('home')">Save to Catalog</button>
+          <button class="btn btn-primary" onclick="showScreen('home')">Assign & Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SPOOL DETAIL SCREEN -->
+    <div id="spool-detail" class="screen">
+      <div class="status-bar">
+        <div class="status-left">
+          <button class="back-btn" onclick="showScreen('ams-detail')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+          </button>
+          <span class="title">Spool Details</span>
+        </div>
+        <div class="status-right">
+          <span class="time">14:23</span>
+        </div>
+      </div>
+
+      <div class="spool-detail-content">
+        <!-- Spool Header -->
+        <div class="spool-detail-header">
+          <div class="spool-detail-visual">
+            <div class="big-spool">
+              <img src="assets/spool_clean.svg" alt="">
+              <div class="color-tint" style="background: #F5C518;"></div>
+            </div>
+            <span class="slot-badge">A1</span>
+          </div>
+          <div class="spool-detail-info">
+            <div class="material-name">PLA Basic</div>
+            <div class="color-name">
+              <span class="color-dot" style="background: #F5C518;"></span>
+              Yellow
+            </div>
+            <div class="brand">Bambu Lab • 1.75mm</div>
+            <div class="weight-display">
+              <span class="value">847</span>
+              <span class="unit">g</span>
+              <span class="pct">(85%)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Print Settings Section -->
+        <div class="spool-detail-section">
+          <h4>Print Settings</h4>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-label">Nozzle Temp</span>
+              <span class="detail-value">190-220°C</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Bed Temp</span>
+              <span class="detail-value">45-65°C</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Max Speed</span>
+              <span class="detail-value">500mm/s</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Spool Info Section -->
+        <div class="spool-detail-section">
+          <h4>Spool Information</h4>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-label">Tag ID</span>
+              <span class="detail-value">A4B7C912</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Initial Weight</span>
+              <span class="detail-value">1000g</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Used</span>
+              <span class="detail-value">153g</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Last Weighed</span>
+              <span class="detail-value">2 min ago</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Added</span>
+              <span class="detail-value">Dec 10, 2024</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Uses</span>
+              <span class="detail-value">12 prints</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="spool-detail-actions">
+          <button class="btn btn-secondary btn-sm" onclick="showScreen('ams-detail')">Move Slot</button>
+          <button class="btn btn-secondary btn-sm">Edit Info</button>
+          <button class="btn btn-danger btn-sm">Remove</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETTINGS SCREEN -->
+    <div id="settings" class="screen">
+      <div class="status-bar">
+        <div class="status-left">
+          <button class="back-btn" onclick="showScreen('home')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+          </button>
+          <img class="logo" src="assets/spoolbuddy_logo_dark_transp.png" alt="SpoolBuddy">
+        </div>
+        <div class="printer-selector">
+          <span class="printer-status connected"></span>
+          <span class="printer-name">X1C-Studio</span>
+          <span class="alert-badge"></span>
+          <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div class="status-right">
+          <div class="notification-bell">
+            <svg viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg>
+            <span class="badge">3</span>
+          </div>
+          <span class="time">14:23</span>
+        </div>
+      </div>
+
+      <div class="content" style="overflow-y: auto;">
+        <!-- Network Section -->
+        <div class="settings-section-title">Network</div>
+        <div class="settings-list">
+          <div class="settings-item">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+            <span class="label">WiFi</span>
+            <span class="value">SpoolBuddy-Net</span>
+            <svg class="chevron" viewBox="0 0 24 24" width="16" height="16" fill="#707070"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+          <div class="settings-item">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z"/></svg>
+            <span class="label">Backend Server</span>
+            <span class="value">192.168.1.100:3000</span>
+            <svg class="chevron" viewBox="0 0 24 24" width="16" height="16" fill="#707070"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+        </div>
+
+        <!-- Printers Section -->
+        <div class="settings-section-title">Printers</div>
+        <div class="settings-list">
+          <div class="settings-item">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>
+            <span class="label">X1C-Studio</span>
+            <span class="value" style="color: #00FF00;">● Connected</span>
+            <svg class="chevron" viewBox="0 0 24 24" width="16" height="16" fill="#707070"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+          <div class="settings-item">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>
+            <span class="label">P1S-Garage</span>
+            <span class="value" style="color: #707070;">● Offline</span>
+            <svg class="chevron" viewBox="0 0 24 24" width="16" height="16" fill="#707070"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+          <div class="settings-item">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            <span class="label">Add Printer</span>
+            <svg class="chevron" viewBox="0 0 24 24" width="16" height="16" fill="#707070"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+        </div>
+
+        <!-- Hardware Section -->
+        <div class="settings-section-title">Hardware</div>
+        <div class="settings-list">
+          <div class="settings-item">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z"/></svg>
+            <span class="label">Scale Calibration</span>
+            <span class="value">Last: 2d ago</span>
+            <svg class="chevron" viewBox="0 0 24 24" width="16" height="16" fill="#707070"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+          <div class="settings-item">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 18H4V4h16v16zM18 6h-5c-1.1 0-2 .9-2 2v2.28c-.6.35-1 .98-1 1.72 0 1.1.9 2 2 2s2-.9 2-2c0-.74-.4-1.38-1-1.72V8h3v8H8V8h2V6H6v12h12V6z"/></svg>
+            <span class="label">NFC Reader</span>
+            <span class="value" style="color: #00FF00;">● Ready</span>
+            <svg class="chevron" viewBox="0 0 24 24" width="16" height="16" fill="#707070"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+          <div class="settings-item">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14z"/></svg>
+            <span class="label">Display Brightness</span>
+            <span class="value">80%</span>
+            <svg class="chevron" viewBox="0 0 24 24" width="16" height="16" fill="#707070"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+        </div>
+
+        <!-- System Section -->
+        <div class="settings-section-title">System</div>
+        <div class="settings-list">
+          <div class="settings-item">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1-2.73 2.71-2.73 7.08 0 9.79s7.15 2.71 9.88 0C18.32 15.65 19 14.08 19 12.1h2c0 1.98-.88 4.55-2.64 6.29-3.51 3.48-9.21 3.48-12.72 0-3.5-3.47-3.53-9.11-.02-12.58s9.14-3.47 12.65 0L21 3v7.12z"/></svg>
+            <span class="label">Check for Updates</span>
+            <span class="value">v1.0.2</span>
+            <svg class="chevron" viewBox="0 0 24 24" width="16" height="16" fill="#707070"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+          <div class="settings-item">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/></svg>
+            <span class="label">Advanced Settings</span>
+            <svg class="chevron" viewBox="0 0 24 24" width="16" height="16" fill="#707070"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+          <div class="settings-item">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
+            <span class="label">About SpoolBuddy</span>
+            <svg class="chevron" viewBox="0 0 24 24" width="16" height="16" fill="#707070"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+
+      // Update nav buttons
+      document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+      const navBtn = document.querySelector(`.nav button[onclick*="'${id}'"]`);
+      if (navBtn) navBtn.classList.add('active');
+    }
+  </script>
+</body>
+</html>

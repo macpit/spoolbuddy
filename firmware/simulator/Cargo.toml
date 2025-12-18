@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 description = "Desktop GUI simulator for SpoolBuddy - generates PNG screenshots"
+default-run = "spoolbuddy-simulator"
+
+[[bin]]
+name = "spoolbuddy-simulator"
+path = "src/main.rs"
 
 [[bin]]
 name = "test_minimal"

@@ -5,9 +5,17 @@ ESP32-S3 firmware for the SpoolBuddy device.
 ## Hardware
 
 - **Board**: Waveshare ESP32-S3-Touch-LCD-4.3
-- **Display**: 4.3" 800x480 IPS with capacitive touch (GT911)
+- **Display**: 4.3" 800x480 IPS RGB parallel interface (DPI)
+- **Touch**: GT911 capacitive touch controller (I2C)
+- **IO Expander**: CH422G (I2C) - controls backlight, LCD reset, touch reset
 - **NFC Reader**: PN5180 (SPI)
 - **Scale**: HX711 + Load Cell (GPIO)
+
+### USB Ports
+
+The board has **two USB-C ports**:
+- **Bottom port**: USB-UART/JTAG - Use this for flashing and serial monitor
+- **Top port**: USB-OTG - For USB device mode (not used for development)
 
 ## Testing on Standalone ESP32-S3
 

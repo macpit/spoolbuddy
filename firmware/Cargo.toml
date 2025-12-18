@@ -6,45 +6,29 @@ license = "MIT"
 
 [dependencies]
 # ESP32-S3 HAL (for Waveshare ESP32-S3-Touch-LCD-4.3)
-esp-hal = { version = "0.23", features = ["esp32s3"] }
-esp-hal-embassy = { version = "0.6", features = ["esp32s3"] }
-esp-backtrace = { version = "0.15", features = ["esp32s3", "panic-handler", "println"] }
-esp-println = { version = "0.13", features = ["esp32s3", "log"] }
-esp-alloc = "0.6"
-esp-bootloader-esp-idf = { version = "0.3", features = ["esp32s3"] }
-
-# Async runtime - use esp-hal's built-in embassy support
-embassy-executor = { version = "0.7", features = ["task-arena-size-32768"] }
-embassy-time = "0.4"
-embassy-sync = "0.6"
-
-# Embedded basics
-embedded-hal = "1.0"
-embedded-hal-async = "1.0"
-
-# Graphics
-embedded-graphics = "0.8"
-embedded-graphics-core = "0.4"
-
-# Display and touch
-display-interface = "0.5"
-mipidsi = { version = "0.8", optional = true }
+esp-hal = { version = "1.0", features = ["esp32s3", "log-04", "unstable", "psram"] }
+esp-backtrace = { version = "0.18", features = ["esp32s3", "panic-handler", "println"] }
+esp-println = { version = "0.16", features = ["esp32s3", "log-04"] }
+esp-bootloader-esp-idf = { version = "0.4", features = ["esp32s3", "log-04"] }
 
 # Logging
 log = "0.4"
 
+# Graphics
+embedded-graphics = "0.8"
+
+# Memory allocation (for PSRAM framebuffer)
+esp-alloc = "0.7"
+
 # Utilities
-heapless = "0.8"
-static_cell = "2.1"
 critical-section = "1.1"
 
 [features]
 default = []
-mipidsi-display = ["mipidsi"]
 
 [profile.release]
 opt-level = "s"
-lto = "fat"
+lto = false
 
 [profile.dev]
 opt-level = 1

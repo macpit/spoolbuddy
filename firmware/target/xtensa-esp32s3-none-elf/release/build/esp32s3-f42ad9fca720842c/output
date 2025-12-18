@@ -1,3 +1,0 @@
-cargo:rustc-link-search=/opt/claude/projects/SpoolStation/firmware/target/xtensa-esp32s3-none-elf/release/build/esp32s3-f42ad9fca720842c/out
-cargo:rerun-if-changed=device.x
-cargo:rerun-if-changed=build.rs

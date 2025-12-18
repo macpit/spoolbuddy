@@ -3,6 +3,7 @@
 //! Supports both light and dark themes with teal accent colors.
 
 use embedded_graphics::pixelcolor::Rgb565;
+use embedded_graphics::prelude::{IntoStorage, RgbColor};
 
 /// Theme mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -45,22 +46,22 @@ pub struct ThemeColors {
     pub border: Rgb565,
 }
 
-/// Dark theme colors
+/// Dark theme colors - Bambu Lab inspired
 pub const DARK_THEME: ThemeColors = ThemeColors {
-    bg: Rgb565::new(0x03, 0x03, 0x05),              // #1a1a2e
-    card_bg: Rgb565::new(0x05, 0x05, 0x08),         // #2d2d44
-    primary: Rgb565::new(0x00, 0x35, 0x15),         // #00d4aa (teal)
-    text_primary: Rgb565::WHITE,
-    text_secondary: Rgb565::new(0x14, 0x14, 0x16),  // #a0a0b0
-    success: Rgb565::new(0x09, 0x37, 0x10),         // #4ade80
-    warning: Rgb565::new(0x1f, 0x2f, 0x04),         // #fbbf24
-    error: Rgb565::new(0x1f, 0x0e, 0x0e),           // #f87171
-    disabled: Rgb565::new(0x08, 0x08, 0x0a),        // #404050
-    status_bar_bg: Rgb565::new(0x02, 0x02, 0x04),   // #121220
-    button_bg: Rgb565::new(0x05, 0x05, 0x08),       // #2d2d44
-    button_pressed: Rgb565::new(0x00, 0x35, 0x15),  // primary
-    progress_bg: Rgb565::new(0x05, 0x05, 0x08),     // card_bg
-    border: Rgb565::new(0x08, 0x10, 0x10),          // #404060
+    bg: Rgb565::new(0x03, 0x03, 0x03),              // #1A1A1A (near black)
+    card_bg: Rgb565::new(0x05, 0x0B, 0x0B),         // #2D2D2D (dark gray)
+    primary: Rgb565::new(0x00, 0x2B, 0x16),         // #00ADB5 (cyan/teal - Bambu style)
+    text_primary: Rgb565::WHITE,                    // #FFFFFF
+    text_secondary: Rgb565::new(0x16, 0x2C, 0x16),  // #B0B0B0 (gray)
+    success: Rgb565::new(0x09, 0x2B, 0x0A),         // #4CAF50 (green)
+    warning: Rgb565::new(0x1F, 0x30, 0x00),         // #FFC107 (amber)
+    error: Rgb565::new(0x1E, 0x08, 0x06),           // #F44336 (red)
+    disabled: Rgb565::new(0x0E, 0x1C, 0x0E),        // #707070 (muted)
+    status_bar_bg: Rgb565::new(0x02, 0x04, 0x02),   // #101010 (darker)
+    button_bg: Rgb565::new(0x05, 0x0B, 0x0B),       // #2D2D2D (card_bg)
+    button_pressed: Rgb565::new(0x00, 0x2B, 0x16),  // primary
+    progress_bg: Rgb565::new(0x07, 0x0F, 0x0F),     // #3D3D3D (elevated)
+    border: Rgb565::new(0x07, 0x0F, 0x0F),          // #3D3D3D
 };
 
 /// Light theme colors

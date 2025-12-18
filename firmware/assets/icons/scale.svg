@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- Digital scale icon -->
+  <!-- Scale base -->
+  <rect x="4" y="32" width="40" height="12" rx="2" fill="#3D3D3D"/>
+
+  <!-- Scale platform -->
+  <rect x="2" y="28" width="44" height="6" rx="1" fill="#2D2D2D" stroke="#3D3D3D" stroke-width="1"/>
+
+  <!-- Display screen -->
+  <rect x="10" y="36" width="28" height="6" rx="1" fill="#1A1A1A"/>
+
+  <!-- Display digits (abstract) -->
+  <rect x="14" y="37" width="6" height="4" fill="#00ADB5" opacity="0.8"/>
+  <rect x="22" y="37" width="6" height="4" fill="#00ADB5" opacity="0.8"/>
+  <rect x="30" y="37" width="6" height="4" fill="#00ADB5" opacity="0.8"/>
+
+  <!-- Weight on platform (spool silhouette) -->
+  <ellipse cx="24" cy="20" rx="14" ry="8" fill="#2D2D2D" stroke="#3D3D3D" stroke-width="1"/>
+  <ellipse cx="24" cy="20" rx="4" ry="2" fill="#1A1A1A"/>
+</svg>

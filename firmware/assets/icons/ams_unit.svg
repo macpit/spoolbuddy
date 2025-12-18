@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 80" fill="none">
+  <!-- AMS Unit with 4 slots - Bambu Lab style -->
+
+  <!-- Main housing -->
+  <rect x="2" y="2" width="216" height="76" rx="6" stroke="#3D3D3D" stroke-width="2" fill="#2D2D2D"/>
+
+  <!-- Slot 1 -->
+  <g transform="translate(8, 8)">
+    <rect width="44" height="56" rx="3" fill="#1A1A1A"/>
+    <rect x="4" y="4" width="36" height="40" rx="2" fill="#SLOT1_COLOR" class="slot1-fill"/>
+    <ellipse cx="22" cy="24" rx="5" ry="12" fill="#1A1A1A"/>
+    <text x="22" y="52" text-anchor="middle" fill="#707070" font-size="10" font-family="sans-serif">1</text>
+  </g>
+
+  <!-- Slot 2 -->
+  <g transform="translate(58, 8)">
+    <rect width="44" height="56" rx="3" fill="#1A1A1A"/>
+    <rect x="4" y="4" width="36" height="40" rx="2" fill="#SLOT2_COLOR" class="slot2-fill"/>
+    <ellipse cx="22" cy="24" rx="5" ry="12" fill="#1A1A1A"/>
+    <text x="22" y="52" text-anchor="middle" fill="#707070" font-size="10" font-family="sans-serif">2</text>
+  </g>
+
+  <!-- Slot 3 -->
+  <g transform="translate(108, 8)">
+    <rect width="44" height="56" rx="3" fill="#1A1A1A"/>
+    <rect x="4" y="4" width="36" height="40" rx="2" fill="#SLOT3_COLOR" class="slot3-fill"/>
+    <ellipse cx="22" cy="24" rx="5" ry="12" fill="#1A1A1A"/>
+    <text x="22" y="52" text-anchor="middle" fill="#707070" font-size="10" font-family="sans-serif">3</text>
+  </g>
+
+  <!-- Slot 4 -->
+  <g transform="translate(158, 8)">
+    <rect width="44" height="56" rx="3" fill="#1A1A1A"/>
+    <rect x="4" y="4" width="36" height="40" rx="2" fill="#SLOT4_COLOR" class="slot4-fill"/>
+    <ellipse cx="22" cy="24" rx="5" ry="12" fill="#1A1A1A"/>
+    <text x="22" y="52" text-anchor="middle" fill="#707070" font-size="10" font-family="sans-serif">4</text>
+  </g>
+
+  <!-- AMS label -->
+  <text x="110" y="74" text-anchor="middle" fill="#00ADB5" font-size="8" font-family="sans-serif">AMS</text>
+</svg>

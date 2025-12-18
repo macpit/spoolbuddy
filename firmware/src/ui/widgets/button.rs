@@ -254,7 +254,7 @@ impl<'a> ButtonBar<'a> {
         let button_width = (screen_width - spacing::MD as u32 * (num_buttons + 1)) / num_buttons;
 
         for (i, label) in self.buttons.iter().enumerate() {
-            let x = spacing::MD + (button_width + spacing::MD as u32) * (i as u32);
+            let x = spacing::MD as u32 + (button_width + spacing::MD as u32) * (i as u32);
             let button = Button::new(
                 Point::new(x as i32, self.y),
                 Size::new(button_width, self.height),
