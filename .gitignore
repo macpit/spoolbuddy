@@ -48,6 +48,7 @@ screenshots/
 
 # Rust / Firmware
 firmware/target/
+lvgl-simulator/target/
 Cargo.lock
 
 # Misc artifacts
