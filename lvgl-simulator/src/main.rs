@@ -156,6 +156,10 @@ fn run_headless(screen: &str) {
                 create_catalog_screen();
                 "catalog"
             }
+            "settings" => {
+                create_settings_screen();
+                "settings"
+            }
             _ => {
                 create_home_screen();
                 "home"
@@ -3117,6 +3121,156 @@ unsafe fn create_catalog_card(
     lvgl_sys::lv_obj_set_style_text_color(weight_lbl, lv_color_hex(COLOR_TEXT_MUTED), 0);
     lvgl_sys::lv_obj_set_style_text_font(weight_lbl, &lvgl_sys::lv_font_montserrat_10, 0);
     lvgl_sys::lv_obj_set_pos(weight_lbl, 65, 48);
+}
+
+/// Create Settings screen
+unsafe fn create_settings_screen() {
+    let disp = lvgl_sys::lv_disp_get_default();
+    let scr = lvgl_sys::lv_disp_get_scr_act(disp);
+    lvgl_sys::lv_obj_set_style_bg_color(scr, lv_color_hex(COLOR_BG), 0);
+
+    // Status bar (same as home screen style)
+    let status_bar = lvgl_sys::lv_obj_create(scr);
+    lvgl_sys::lv_obj_set_size(status_bar, 800, 44);
+    lvgl_sys::lv_obj_set_pos(status_bar, 0, 0);
+    lvgl_sys::lv_obj_clear_flag(status_bar, lvgl_sys::LV_OBJ_FLAG_SCROLLABLE);
+    lvgl_sys::lv_obj_set_style_bg_color(status_bar, lv_color_hex(COLOR_BG), 0);
+    lvgl_sys::lv_obj_set_style_border_width(status_bar, 0, 0);
+    lvgl_sys::lv_obj_set_style_radius(status_bar, 0, 0);
+    set_style_pad_all(status_bar, 0);
+
+    // SpoolBuddy logo/text
+    let logo_lbl = lvgl_sys::lv_label_create(status_bar);
+    let logo_txt = CString::new("SpoolBuddy").unwrap();
+    lvgl_sys::lv_label_set_text(logo_lbl, logo_txt.as_ptr());
+    lvgl_sys::lv_obj_set_style_text_color(logo_lbl, lv_color_hex(COLOR_ACCENT), 0);
+    lvgl_sys::lv_obj_set_style_text_font(logo_lbl, &lvgl_sys::lv_font_montserrat_14, 0);
+    lvgl_sys::lv_obj_set_pos(logo_lbl, 16, 14);
+
+    // Printer dropdown
+    let printer_btn = lvgl_sys::lv_obj_create(status_bar);
+    lvgl_sys::lv_obj_set_size(printer_btn, 150, 30);
+    lvgl_sys::lv_obj_align(printer_btn, lvgl_sys::LV_ALIGN_TOP_MID as u8, 0, 7);
+    lvgl_sys::lv_obj_clear_flag(printer_btn, lvgl_sys::LV_OBJ_FLAG_SCROLLABLE);
+    lvgl_sys::lv_obj_set_style_bg_color(printer_btn, lv_color_hex(0x2D2D2D), 0);
+    lvgl_sys::lv_obj_set_style_radius(printer_btn, 15, 0);
+    lvgl_sys::lv_obj_set_style_border_width(printer_btn, 0, 0);
+    set_style_pad_all(printer_btn, 0);
+
+    let printer_dot = lvgl_sys::lv_obj_create(printer_btn);
+    lvgl_sys::lv_obj_set_size(printer_dot, 8, 8);
+    lvgl_sys::lv_obj_set_pos(printer_dot, 12, 11);
+    lvgl_sys::lv_obj_clear_flag(printer_dot, lvgl_sys::LV_OBJ_FLAG_SCROLLABLE);
+    lvgl_sys::lv_obj_set_style_bg_color(printer_dot, lv_color_hex(COLOR_ACCENT), 0);
+    lvgl_sys::lv_obj_set_style_radius(printer_dot, 4, 0);
+    lvgl_sys::lv_obj_set_style_border_width(printer_dot, 0, 0);
+    set_style_pad_all(printer_dot, 0);
+
+    let printer_lbl = lvgl_sys::lv_label_create(printer_btn);
+    let printer_txt = CString::new("X1C-Studio").unwrap();
+    lvgl_sys::lv_label_set_text(printer_lbl, printer_txt.as_ptr());
+    lvgl_sys::lv_obj_set_style_text_color(printer_lbl, lv_color_hex(COLOR_WHITE), 0);
+    lvgl_sys::lv_obj_set_style_text_font(printer_lbl, &lvgl_sys::lv_font_montserrat_12, 0);
+    lvgl_sys::lv_obj_set_pos(printer_lbl, 28, 7);
+
+    // Status icons on right
+    let time_lbl = lvgl_sys::lv_label_create(status_bar);
+    let time_txt = CString::new("14:23").unwrap();
+    lvgl_sys::lv_label_set_text(time_lbl, time_txt.as_ptr());
+    lvgl_sys::lv_obj_set_style_text_color(time_lbl, lv_color_hex(COLOR_WHITE), 0);
+    lvgl_sys::lv_obj_set_style_text_font(time_lbl, &lvgl_sys::lv_font_montserrat_14, 0);
+    lvgl_sys::lv_obj_align(time_lbl, lvgl_sys::LV_ALIGN_TOP_RIGHT as u8, -16, 14);
+
+    // Content area
+    let content_y: i16 = 52;
+
+    // Network section
+    create_section_header(scr, 16, content_y, "Network");
+
+    create_settings_row(scr, 16, content_y + 24, "WiFi", "SpoolBuddy-Net", "", true);
+    create_settings_row(scr, 16, content_y + 68, "Backend Server", "192.168.1.100:3000", "", true);
+
+    // Printers section
+    let printers_y = content_y + 130;
+    create_section_header(scr, 16, printers_y, "Printers");
+
+    create_settings_row(scr, 16, printers_y + 24, "X1C-Studio", "* Connected", "green", true);
+    create_settings_row(scr, 16, printers_y + 68, "P1S-Garage", "* Offline", "gray", true);
+    create_settings_row(scr, 16, printers_y + 112, "Add Printer", "", "", true);
+
+    // Hardware section
+    let hardware_y = printers_y + 174;
+    create_section_header(scr, 16, hardware_y, "Hardware");
+
+    create_settings_row(scr, 16, hardware_y + 24, "Scale Calibration", "Last: 2d ago", "", true);
+    create_settings_row(scr, 16, hardware_y + 68, "NFC Reader", "* Ready", "green", true);
+    create_settings_row(scr, 16, hardware_y + 112, "Display Brightness", "80%", "", true);
+}
+
+/// Helper: Create section header
+unsafe fn create_section_header(parent: *mut lvgl_sys::lv_obj_t, x: i16, y: i16, text: &str) {
+    let lbl = lvgl_sys::lv_label_create(parent);
+    let lbl_txt = CString::new(text).unwrap();
+    lvgl_sys::lv_label_set_text(lbl, lbl_txt.as_ptr());
+    lvgl_sys::lv_obj_set_style_text_color(lbl, lv_color_hex(COLOR_TEXT_MUTED), 0);
+    lvgl_sys::lv_obj_set_style_text_font(lbl, &lvgl_sys::lv_font_montserrat_12, 0);
+    lvgl_sys::lv_obj_set_pos(lbl, x, y);
+}
+
+/// Helper: Create settings row
+unsafe fn create_settings_row(parent: *mut lvgl_sys::lv_obj_t, x: i16, y: i16, title: &str, value: &str, status_color: &str, has_arrow: bool) {
+    let row = lvgl_sys::lv_obj_create(parent);
+    lvgl_sys::lv_obj_set_size(row, 768, 40);
+    lvgl_sys::lv_obj_set_pos(row, x, y);
+    lvgl_sys::lv_obj_clear_flag(row, lvgl_sys::LV_OBJ_FLAG_SCROLLABLE);
+    lvgl_sys::lv_obj_set_style_bg_color(row, lv_color_hex(0x2D2D2D), 0);
+    lvgl_sys::lv_obj_set_style_radius(row, 8, 0);
+    lvgl_sys::lv_obj_set_style_border_width(row, 0, 0);
+    set_style_pad_all(row, 0);
+
+    // Green indicator bar on left
+    let indicator = lvgl_sys::lv_obj_create(row);
+    lvgl_sys::lv_obj_set_size(indicator, 4, 24);
+    lvgl_sys::lv_obj_set_pos(indicator, 0, 8);
+    lvgl_sys::lv_obj_clear_flag(indicator, lvgl_sys::LV_OBJ_FLAG_SCROLLABLE);
+    lvgl_sys::lv_obj_set_style_bg_color(indicator, lv_color_hex(COLOR_ACCENT), 0);
+    lvgl_sys::lv_obj_set_style_radius(indicator, 0, 0);
+    lvgl_sys::lv_obj_set_style_border_width(indicator, 0, 0);
+    set_style_pad_all(indicator, 0);
+
+    // Title
+    let title_lbl = lvgl_sys::lv_label_create(row);
+    let title_txt = CString::new(title).unwrap();
+    lvgl_sys::lv_label_set_text(title_lbl, title_txt.as_ptr());
+    lvgl_sys::lv_obj_set_style_text_color(title_lbl, lv_color_hex(COLOR_WHITE), 0);
+    lvgl_sys::lv_obj_set_style_text_font(title_lbl, &lvgl_sys::lv_font_montserrat_14, 0);
+    lvgl_sys::lv_obj_set_pos(title_lbl, 16, 11);
+
+    // Value/status
+    if !value.is_empty() {
+        let value_lbl = lvgl_sys::lv_label_create(row);
+        let value_txt = CString::new(value).unwrap();
+        lvgl_sys::lv_label_set_text(value_lbl, value_txt.as_ptr());
+
+        let color = match status_color {
+            "green" => COLOR_ACCENT,
+            "gray" => COLOR_TEXT_MUTED,
+            _ => COLOR_TEXT_MUTED,
+        };
+        lvgl_sys::lv_obj_set_style_text_color(value_lbl, lv_color_hex(color), 0);
+        lvgl_sys::lv_obj_set_style_text_font(value_lbl, &lvgl_sys::lv_font_montserrat_12, 0);
+        lvgl_sys::lv_obj_align(value_lbl, lvgl_sys::LV_ALIGN_RIGHT_MID as u8, -30, 0);
+    }
+
+    // Arrow
+    if has_arrow {
+        let arrow_lbl = lvgl_sys::lv_label_create(row);
+        let arrow_txt = CString::new(">").unwrap();
+        lvgl_sys::lv_label_set_text(arrow_lbl, arrow_txt.as_ptr());
+        lvgl_sys::lv_obj_set_style_text_color(arrow_lbl, lv_color_hex(COLOR_TEXT_MUTED), 0);
+        lvgl_sys::lv_obj_set_style_text_font(arrow_lbl, &lvgl_sys::lv_font_montserrat_14, 0);
+        lvgl_sys::lv_obj_align(arrow_lbl, lvgl_sys::LV_ALIGN_RIGHT_MID as u8, -10, 0);
+    }
 }
 
 fn lv_color_hex(hex: u32) -> lvgl_sys::lv_color_t {
