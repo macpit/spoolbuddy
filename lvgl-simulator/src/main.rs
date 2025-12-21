@@ -2482,31 +2482,27 @@ unsafe fn create_scan_result_screen() {
     lvgl_sys::lv_obj_set_style_text_font(assign_label, &lvgl_sys::lv_font_montserrat_12, 0);
     lvgl_sys::lv_obj_set_pos(assign_label, 16, 252);
 
-    // AMS slot rows
-    let slot_y: i16 = 275;
-    let slot_row_h: i16 = 36;
-    let slot_gap: i16 = 8;
-
-    // Row 1: A, B, C, D
-    create_ams_slot_row(scr, 16, slot_y, "A", &[
+    // AMS units row - visual AMS device representations
+    let ams_y: i16 = 272;
+    create_ams_unit_visual(scr, 16, ams_y, "A", &[
         (0xF5C518, true), (0, false), (0x4CAF50, false), (0, false)
     ]);
-    create_ams_slot_row(scr, 210, slot_y, "B", &[
+    create_ams_unit_visual(scr, 210, ams_y, "B", &[
         (0xE91E63, false), (0x2196F3, false), (0x4CAF50, false), (0xF5C518, true)
     ]);
-    create_ams_slot_row(scr, 404, slot_y, "C", &[
+    create_ams_unit_visual(scr, 404, ams_y, "C", &[
         (0xFFFFFF, false), (0, false), (0, false), (0, false)
     ]);
-    create_ams_slot_row(scr, 598, slot_y, "D", &[
+    create_ams_unit_visual(scr, 598, ams_y, "D", &[
         (0x00BCD4, false), (0xFF5722, false), (0, false), (0, false)
     ]);
 
-    // Row 2: HT-A, HT-B, Ext 1, Ext 2
-    let row2_y = slot_y + slot_row_h + slot_gap;
-    create_single_slot(scr, 16, row2_y, "HT-A", 0x673AB7, false);
-    create_single_slot(scr, 110, row2_y, "HT-B", 0xECEFF1, false);
-    create_single_slot(scr, 204, row2_y, "Ext 1", 0x607D8B, false);
-    create_single_slot(scr, 298, row2_y, "Ext 2", 0xCDDC39, false);
+    // Row 2: HT units and External slots
+    let row2_y = ams_y + 70;
+    create_ht_slot_visual(scr, 16, row2_y, "HT-A", 0x673AB7, false);
+    create_ht_slot_visual(scr, 110, row2_y, "HT-B", 0xECEFF1, false);
+    create_ext_slot_visual(scr, 204, row2_y, "Ext 1", 0x607D8B, false);
+    create_ext_slot_visual(scr, 298, row2_y, "Ext 2", 0xCDDC39, false);
 
     // Assign & Save button
     let btn = lvgl_sys::lv_btn_create(scr);
@@ -2524,47 +2520,67 @@ unsafe fn create_scan_result_screen() {
     lvgl_sys::lv_obj_align(btn_lbl, lvgl_sys::LV_ALIGN_CENTER as u8, 0, 0);
 }
 
-/// Helper: Create AMS slot row (label + 4 slots)
-unsafe fn create_ams_slot_row(parent: *mut lvgl_sys::lv_obj_t, x: i16, y: i16, label: &str, slots: &[(u32, bool); 4]) {
-    let row = lvgl_sys::lv_obj_create(parent);
-    lvgl_sys::lv_obj_set_size(row, 180, 36);
-    lvgl_sys::lv_obj_set_pos(row, x, y);
-    lvgl_sys::lv_obj_clear_flag(row, lvgl_sys::LV_OBJ_FLAG_SCROLLABLE);
-    lvgl_sys::lv_obj_set_style_bg_opa(row, 0, 0);
-    lvgl_sys::lv_obj_set_style_border_width(row, 0, 0);
-    set_style_pad_all(row, 0);
+/// Helper: Create AMS unit visual (box with 4 spool slots)
+unsafe fn create_ams_unit_visual(parent: *mut lvgl_sys::lv_obj_t, x: i16, y: i16, label: &str, slots: &[(u32, bool); 4]) {
+    // AMS unit container - looks like an AMS device
+    let unit = lvgl_sys::lv_obj_create(parent);
+    lvgl_sys::lv_obj_set_size(unit, 180, 60);
+    lvgl_sys::lv_obj_set_pos(unit, x, y);
+    lvgl_sys::lv_obj_clear_flag(unit, lvgl_sys::LV_OBJ_FLAG_SCROLLABLE);
+    lvgl_sys::lv_obj_set_style_bg_color(unit, lv_color_hex(0x252525), 0);
+    lvgl_sys::lv_obj_set_style_radius(unit, 8, 0);
+    lvgl_sys::lv_obj_set_style_border_color(unit, lv_color_hex(0x3D3D3D), 0);
+    lvgl_sys::lv_obj_set_style_border_width(unit, 1, 0);
+    lvgl_sys::lv_obj_set_style_shadow_color(unit, lv_color_hex(0x000000), 0);
+    lvgl_sys::lv_obj_set_style_shadow_width(unit, 10, 0);
+    lvgl_sys::lv_obj_set_style_shadow_ofs_y(unit, 3, 0);
+    lvgl_sys::lv_obj_set_style_shadow_opa(unit, 80, 0);
+    set_style_pad_all(unit, 0);
 
-    // Label
-    let lbl = lvgl_sys::lv_label_create(row);
+    // AMS label badge
+    let badge = lvgl_sys::lv_obj_create(unit);
+    lvgl_sys::lv_obj_set_size(badge, 24, 18);
+    lvgl_sys::lv_obj_set_pos(badge, 6, 4);
+    lvgl_sys::lv_obj_clear_flag(badge, lvgl_sys::LV_OBJ_FLAG_SCROLLABLE);
+    lvgl_sys::lv_obj_set_style_bg_color(badge, lv_color_hex(0x3D3D3D), 0);
+    lvgl_sys::lv_obj_set_style_radius(badge, 4, 0);
+    lvgl_sys::lv_obj_set_style_border_width(badge, 0, 0);
+    set_style_pad_all(badge, 0);
+
+    let lbl = lvgl_sys::lv_label_create(badge);
     let lbl_txt = CString::new(label).unwrap();
     lvgl_sys::lv_label_set_text(lbl, lbl_txt.as_ptr());
     lvgl_sys::lv_obj_set_style_text_color(lbl, lv_color_hex(COLOR_WHITE), 0);
-    lvgl_sys::lv_obj_set_style_text_font(lbl, &lvgl_sys::lv_font_montserrat_14, 0);
-    lvgl_sys::lv_obj_set_pos(lbl, 0, 8);
+    lvgl_sys::lv_obj_set_style_text_font(lbl, &lvgl_sys::lv_font_montserrat_12, 0);
+    lvgl_sys::lv_obj_align(lbl, lvgl_sys::LV_ALIGN_CENTER as u8, 0, 0);
 
-    // 4 slots
+    // 4 spool slots in a row
     for (i, (color, selected)) in slots.iter().enumerate() {
-        let sx = 26 + (i as i16) * 38;
-        let slot = lvgl_sys::lv_obj_create(row);
-        lvgl_sys::lv_obj_set_size(slot, 32, 32);
-        lvgl_sys::lv_obj_set_pos(slot, sx, 2);
+        let sx = 8 + (i as i16) * 42;
+        let slot = lvgl_sys::lv_obj_create(unit);
+        lvgl_sys::lv_obj_set_size(slot, 36, 36);
+        lvgl_sys::lv_obj_set_pos(slot, sx, 20);
         lvgl_sys::lv_obj_clear_flag(slot, lvgl_sys::LV_OBJ_FLAG_SCROLLABLE);
-        lvgl_sys::lv_obj_set_style_radius(slot, 16, 0);
+        lvgl_sys::lv_obj_set_style_radius(slot, 18, 0);
         set_style_pad_all(slot, 0);
 
         if *color != 0 {
             lvgl_sys::lv_obj_set_style_bg_color(slot, lv_color_hex(*color), 0);
-            lvgl_sys::lv_obj_set_style_border_color(slot, lv_color_hex(lighten_color(*color, 30)), 0);
         } else {
             lvgl_sys::lv_obj_set_style_bg_color(slot, lv_color_hex(0x3D3D3D), 0);
-            lvgl_sys::lv_obj_set_style_border_color(slot, lv_color_hex(0x505050), 0);
         }
 
         if *selected {
             lvgl_sys::lv_obj_set_style_border_width(slot, 3, 0);
             lvgl_sys::lv_obj_set_style_border_color(slot, lv_color_hex(COLOR_ACCENT), 0);
+            // Add glow effect for selected
+            lvgl_sys::lv_obj_set_style_shadow_color(slot, lv_color_hex(COLOR_ACCENT), 0);
+            lvgl_sys::lv_obj_set_style_shadow_width(slot, 8, 0);
+            lvgl_sys::lv_obj_set_style_shadow_spread(slot, 2, 0);
+            lvgl_sys::lv_obj_set_style_shadow_opa(slot, 150, 0);
         } else {
             lvgl_sys::lv_obj_set_style_border_width(slot, 2, 0);
+            lvgl_sys::lv_obj_set_style_border_color(slot, lv_color_hex(0x505050), 0);
         }
 
         // Slot number
@@ -2582,47 +2598,82 @@ unsafe fn create_ams_slot_row(parent: *mut lvgl_sys::lv_obj_t, x: i16, y: i16, l
     }
 }
 
-/// Helper: Create single slot (HT-A, HT-B, Ext 1, Ext 2)
-unsafe fn create_single_slot(parent: *mut lvgl_sys::lv_obj_t, x: i16, y: i16, label: &str, color: u32, selected: bool) {
+/// Helper: Create HT (High Temp) slot visual
+unsafe fn create_ht_slot_visual(parent: *mut lvgl_sys::lv_obj_t, x: i16, y: i16, label: &str, color: u32, selected: bool) {
     let container = lvgl_sys::lv_obj_create(parent);
-    lvgl_sys::lv_obj_set_size(container, 86, 36);
+    lvgl_sys::lv_obj_set_size(container, 86, 44);
     lvgl_sys::lv_obj_set_pos(container, x, y);
     lvgl_sys::lv_obj_clear_flag(container, lvgl_sys::LV_OBJ_FLAG_SCROLLABLE);
-    lvgl_sys::lv_obj_set_style_bg_opa(container, 0, 0);
-    lvgl_sys::lv_obj_set_style_border_width(container, 0, 0);
+    lvgl_sys::lv_obj_set_style_bg_color(container, lv_color_hex(0x252525), 0);
+    lvgl_sys::lv_obj_set_style_radius(container, 6, 0);
+    lvgl_sys::lv_obj_set_style_border_color(container, lv_color_hex(0x3D3D3D), 0);
+    lvgl_sys::lv_obj_set_style_border_width(container, 1, 0);
     set_style_pad_all(container, 0);
 
     // Label
     let lbl = lvgl_sys::lv_label_create(container);
     let lbl_txt = CString::new(label).unwrap();
     lvgl_sys::lv_label_set_text(lbl, lbl_txt.as_ptr());
-    lvgl_sys::lv_obj_set_style_text_color(lbl, lv_color_hex(COLOR_WHITE), 0);
-    lvgl_sys::lv_obj_set_style_text_font(lbl, &lvgl_sys::lv_font_montserrat_12, 0);
-    lvgl_sys::lv_obj_set_pos(lbl, 0, 8);
+    lvgl_sys::lv_obj_set_style_text_color(lbl, lv_color_hex(COLOR_TEXT_MUTED), 0);
+    lvgl_sys::lv_obj_set_style_text_font(lbl, &lvgl_sys::lv_font_montserrat_10, 0);
+    lvgl_sys::lv_obj_set_pos(lbl, 6, 4);
 
     // Slot circle
     let slot = lvgl_sys::lv_obj_create(container);
-    lvgl_sys::lv_obj_set_size(slot, 32, 32);
-    lvgl_sys::lv_obj_set_pos(slot, 50, 2);
+    lvgl_sys::lv_obj_set_size(slot, 30, 30);
+    lvgl_sys::lv_obj_set_pos(slot, 50, 8);
     lvgl_sys::lv_obj_clear_flag(slot, lvgl_sys::LV_OBJ_FLAG_SCROLLABLE);
-    lvgl_sys::lv_obj_set_style_radius(slot, 16, 0);
+    lvgl_sys::lv_obj_set_style_bg_color(slot, lv_color_hex(color), 0);
+    lvgl_sys::lv_obj_set_style_radius(slot, 15, 0);
     set_style_pad_all(slot, 0);
-
-    if color != 0 {
-        lvgl_sys::lv_obj_set_style_bg_color(slot, lv_color_hex(color), 0);
-        lvgl_sys::lv_obj_set_style_border_color(slot, lv_color_hex(lighten_color(color, 30)), 0);
-    } else {
-        lvgl_sys::lv_obj_set_style_bg_color(slot, lv_color_hex(0x3D3D3D), 0);
-        lvgl_sys::lv_obj_set_style_border_color(slot, lv_color_hex(0x505050), 0);
-    }
 
     if selected {
         lvgl_sys::lv_obj_set_style_border_width(slot, 3, 0);
         lvgl_sys::lv_obj_set_style_border_color(slot, lv_color_hex(COLOR_ACCENT), 0);
     } else {
         lvgl_sys::lv_obj_set_style_border_width(slot, 2, 0);
+        lvgl_sys::lv_obj_set_style_border_color(slot, lv_color_hex(0x505050), 0);
     }
 }
+
+/// Helper: Create External slot visual
+unsafe fn create_ext_slot_visual(parent: *mut lvgl_sys::lv_obj_t, x: i16, y: i16, label: &str, color: u32, selected: bool) {
+    let container = lvgl_sys::lv_obj_create(parent);
+    lvgl_sys::lv_obj_set_size(container, 86, 44);
+    lvgl_sys::lv_obj_set_pos(container, x, y);
+    lvgl_sys::lv_obj_clear_flag(container, lvgl_sys::LV_OBJ_FLAG_SCROLLABLE);
+    lvgl_sys::lv_obj_set_style_bg_color(container, lv_color_hex(0x252525), 0);
+    lvgl_sys::lv_obj_set_style_radius(container, 6, 0);
+    lvgl_sys::lv_obj_set_style_border_color(container, lv_color_hex(0x3D3D3D), 0);
+    lvgl_sys::lv_obj_set_style_border_width(container, 1, 0);
+    set_style_pad_all(container, 0);
+
+    // Label
+    let lbl = lvgl_sys::lv_label_create(container);
+    let lbl_txt = CString::new(label).unwrap();
+    lvgl_sys::lv_label_set_text(lbl, lbl_txt.as_ptr());
+    lvgl_sys::lv_obj_set_style_text_color(lbl, lv_color_hex(COLOR_TEXT_MUTED), 0);
+    lvgl_sys::lv_obj_set_style_text_font(lbl, &lvgl_sys::lv_font_montserrat_10, 0);
+    lvgl_sys::lv_obj_set_pos(lbl, 6, 4);
+
+    // Slot - rounded square for external
+    let slot = lvgl_sys::lv_obj_create(container);
+    lvgl_sys::lv_obj_set_size(slot, 30, 30);
+    lvgl_sys::lv_obj_set_pos(slot, 50, 8);
+    lvgl_sys::lv_obj_clear_flag(slot, lvgl_sys::LV_OBJ_FLAG_SCROLLABLE);
+    lvgl_sys::lv_obj_set_style_bg_color(slot, lv_color_hex(color), 0);
+    lvgl_sys::lv_obj_set_style_radius(slot, 15, 0);
+    set_style_pad_all(slot, 0);
+
+    if selected {
+        lvgl_sys::lv_obj_set_style_border_width(slot, 3, 0);
+        lvgl_sys::lv_obj_set_style_border_color(slot, lv_color_hex(COLOR_ACCENT), 0);
+    } else {
+        lvgl_sys::lv_obj_set_style_border_width(slot, 2, 0);
+        lvgl_sys::lv_obj_set_style_border_color(slot, lv_color_hex(0x505050), 0);
+    }
+}
+
 
 /// Create Spool Detail screen
 unsafe fn create_spool_detail_screen() {
