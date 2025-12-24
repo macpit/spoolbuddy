@@ -1,0 +1,27 @@
+#include "images.h"
+
+const ext_img_desc_t images[23] = {
+    { "humidity", &img_humidity },
+    { "spool_base", &img_spool_base },
+    { "spool_clean", &img_spool_clean },
+    { "spool_fill", &img_spool_fill },
+    { "spool_frame", &img_spool_frame },
+    { "spool_mask", &img_spool_mask },
+    { "spoolbuddy_logo_light", &img_spoolbuddy_logo_light },
+    { "signal", &img_signal },
+    { "nfc", &img_nfc },
+    { "encoding", &img_encoding },
+    { "catalog", &img_catalog },
+    { "settings", &img_settings },
+    { "filament_spool", &img_filament_spool },
+    { "bell", &img_bell },
+    { "dot", &img_dot },
+    { "scale", &img_scale },
+    { "amssetup", &img_amssetup },
+    { "spool", &img_spool },
+    { "spoolbuddy_logo_dark", &img_spoolbuddy_logo_dark },
+    { "back", &img_back },
+    { "ok", &img_ok },
+    { "home", &img_home },
+    { "circle_empty", &img_circle_empty },
+};

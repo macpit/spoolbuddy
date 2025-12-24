@@ -21,16 +21,9 @@ heapless = "0.8"
 # Logging
 log = "0.4"
 
-# Graphics - embedded-graphics for basic shapes
+# Graphics - embedded-graphics for basic shapes (kept for potential future use)
 embedded-graphics = "0.8"
 embedded-graphics-core = "0.4.0"
-
-# LVGL for proper font rendering
-lvgl = { version = "0.6.2", default-features = false, features = [
-    "embedded_graphics",
-    "unsafe_no_autoinit",
-] }
-lvgl-sys = { version = "0.6.2" }
 
 # Hardware IO
 embedded-hal = "1.0.0"
@@ -44,9 +37,9 @@ cstr_core = "0.2.1"
 [build-dependencies]
 embuild = "0.33"
 
-# Custom 1-bit fonts compiled as ESP-IDF component
+# ESP-IDF components: lvgl, eez_ui, and display_driver
 [[package.metadata.esp-idf-sys.extra_components]]
-component_dirs = ["components/custom_fonts"]
+component_dirs = ["components/lvgl", "components/eez_ui", "components/display_driver"]
 
 [features]
 default = []
@@ -59,12 +52,8 @@ lto = false
 debug = true
 opt-level = "z"
 
-# Patches required for LVGL + ESP-IDF v5.x compatibility
-[patch.crates-io]
-lvgl = { git = "https://github.com/enelson1001/lv_binding_rust" }
-lvgl-sys = { git = "https://github.com/enelson1001/lv_binding_rust" }
-
 # Master branches needed for ESP-IDF v5.2+ (esp_lcd_panel_rgb.h support)
+[patch.crates-io]
 esp-idf-sys = { git = "https://github.com/esp-rs/esp-idf-sys.git" }
 esp-idf-hal = { git = "https://github.com/esp-rs/esp-idf-hal.git" }
 esp-idf-svc = { git = "https://github.com/esp-rs/esp-idf-svc.git" }

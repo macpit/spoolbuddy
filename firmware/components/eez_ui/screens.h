@@ -1,0 +1,314 @@
+#ifndef EEZ_LVGL_UI_SCREENS_H
+#define EEZ_LVGL_UI_SCREENS_H
+
+#include <lvgl/lvgl.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef struct _objects_t {
+    lv_obj_t *main;
+    lv_obj_t *ams_overview;
+    lv_obj_t *scan_result;
+    lv_obj_t *spool_details;
+    lv_obj_t *top_bar;
+    lv_obj_t *spoolbuddy_logo;
+    lv_obj_t *printer_select;
+    lv_obj_t *wifi_signal;
+    lv_obj_t *notification_bell;
+    lv_obj_t *clock;
+    lv_obj_t *bottom_bar;
+    lv_obj_t *status_dot;
+    lv_obj_t *status;
+    lv_obj_t *status_1;
+    lv_obj_t *rught_nozzle;
+    lv_obj_t *obj0;
+    lv_obj_t *obj1;
+    lv_obj_t *obj2;
+    lv_obj_t *obj3;
+    lv_obj_t *obj4;
+    lv_obj_t *obj5;
+    lv_obj_t *obj6;
+    lv_obj_t *obj7;
+    lv_obj_t *obj8;
+    lv_obj_t *obj9;
+    lv_obj_t *obj10;
+    lv_obj_t *obj11;
+    lv_obj_t *obj12;
+    lv_obj_t *ams_setup;
+    lv_obj_t *obj13;
+    lv_obj_t *encode_tag;
+    lv_obj_t *obj14;
+    lv_obj_t *settings;
+    lv_obj_t *obj15;
+    lv_obj_t *catalog;
+    lv_obj_t *obj16;
+    lv_obj_t *nfc_scale;
+    lv_obj_t *obj17;
+    lv_obj_t *obj18;
+    lv_obj_t *obj19;
+    lv_obj_t *obj20;
+    lv_obj_t *obj21;
+    lv_obj_t *obj22;
+    lv_obj_t *left_nozzle;
+    lv_obj_t *obj23;
+    lv_obj_t *obj24;
+    lv_obj_t *obj25;
+    lv_obj_t *obj26;
+    lv_obj_t *obj27;
+    lv_obj_t *obj28;
+    lv_obj_t *obj29;
+    lv_obj_t *obj30;
+    lv_obj_t *obj31;
+    lv_obj_t *obj32;
+    lv_obj_t *obj33;
+    lv_obj_t *obj34;
+    lv_obj_t *obj35;
+    lv_obj_t *obj36;
+    lv_obj_t *obj37;
+    lv_obj_t *obj38;
+    lv_obj_t *obj39;
+    lv_obj_t *obj40;
+    lv_obj_t *obj41;
+    lv_obj_t *obj42;
+    lv_obj_t *obj43;
+    lv_obj_t *obj44;
+    lv_obj_t *obj45;
+    lv_obj_t *obj46;
+    lv_obj_t *printer;
+    lv_obj_t *print_cover;
+    lv_obj_t *printer_label;
+    lv_obj_t *printer_label_1;
+    lv_obj_t *printer_label_2;
+    lv_obj_t *printer_label_3;
+    lv_obj_t *obj47;
+    lv_obj_t *obj48;
+    lv_obj_t *top_bar_1;
+    lv_obj_t *spoolbuddy_logo_1;
+    lv_obj_t *printer_select_1;
+    lv_obj_t *wifi_signal_1;
+    lv_obj_t *notification_bell_1;
+    lv_obj_t *clock_1;
+    lv_obj_t *bottom_bar_1;
+    lv_obj_t *status_dot_1;
+    lv_obj_t *status_2;
+    lv_obj_t *status_3;
+    lv_obj_t *ams_setup_1;
+    lv_obj_t *obj49;
+    lv_obj_t *encode_tag_1;
+    lv_obj_t *obj50;
+    lv_obj_t *settings_1;
+    lv_obj_t *obj51;
+    lv_obj_t *catalog_1;
+    lv_obj_t *obj52;
+    lv_obj_t *obj53;
+    lv_obj_t *obj54;
+    lv_obj_t *obj55;
+    lv_obj_t *obj56;
+    lv_obj_t *obj57;
+    lv_obj_t *obj58;
+    lv_obj_t *obj59;
+    lv_obj_t *obj60;
+    lv_obj_t *obj61;
+    lv_obj_t *obj62;
+    lv_obj_t *obj63;
+    lv_obj_t *obj64;
+    lv_obj_t *obj65;
+    lv_obj_t *obj66;
+    lv_obj_t *obj67;
+    lv_obj_t *obj68;
+    lv_obj_t *obj69;
+    lv_obj_t *obj70;
+    lv_obj_t *obj71;
+    lv_obj_t *obj72;
+    lv_obj_t *obj73;
+    lv_obj_t *obj74;
+    lv_obj_t *obj75;
+    lv_obj_t *obj76;
+    lv_obj_t *obj77;
+    lv_obj_t *obj78;
+    lv_obj_t *obj79;
+    lv_obj_t *obj80;
+    lv_obj_t *obj81;
+    lv_obj_t *obj82;
+    lv_obj_t *obj83;
+    lv_obj_t *obj84;
+    lv_obj_t *obj85;
+    lv_obj_t *obj86;
+    lv_obj_t *obj87;
+    lv_obj_t *obj88;
+    lv_obj_t *obj89;
+    lv_obj_t *obj90;
+    lv_obj_t *obj91;
+    lv_obj_t *obj92;
+    lv_obj_t *obj93;
+    lv_obj_t *obj94;
+    lv_obj_t *obj95;
+    lv_obj_t *obj96;
+    lv_obj_t *obj97;
+    lv_obj_t *obj98;
+    lv_obj_t *obj99;
+    lv_obj_t *obj100;
+    lv_obj_t *obj101;
+    lv_obj_t *obj102;
+    lv_obj_t *obj103;
+    lv_obj_t *obj104;
+    lv_obj_t *obj105;
+    lv_obj_t *obj106;
+    lv_obj_t *obj107;
+    lv_obj_t *obj108;
+    lv_obj_t *obj109;
+    lv_obj_t *obj110;
+    lv_obj_t *obj111;
+    lv_obj_t *obj112;
+    lv_obj_t *obj113;
+    lv_obj_t *obj114;
+    lv_obj_t *obj115;
+    lv_obj_t *obj116;
+    lv_obj_t *obj117;
+    lv_obj_t *top_bar_2;
+    lv_obj_t *spoolbuddy_logo_2;
+    lv_obj_t *printer_select_2;
+    lv_obj_t *wifi_signal_2;
+    lv_obj_t *notification_bell_2;
+    lv_obj_t *clock_2;
+    lv_obj_t *obj118;
+    lv_obj_t *obj119;
+    lv_obj_t *obj120;
+    lv_obj_t *obj121;
+    lv_obj_t *obj122;
+    lv_obj_t *obj123;
+    lv_obj_t *obj124;
+    lv_obj_t *obj125;
+    lv_obj_t *obj126;
+    lv_obj_t *obj127;
+    lv_obj_t *obj128;
+    lv_obj_t *obj129;
+    lv_obj_t *obj130;
+    lv_obj_t *obj131;
+    lv_obj_t *obj132;
+    lv_obj_t *obj133;
+    lv_obj_t *obj134;
+    lv_obj_t *obj135;
+    lv_obj_t *obj136;
+    lv_obj_t *obj137;
+    lv_obj_t *obj138;
+    lv_obj_t *obj139;
+    lv_obj_t *obj140;
+    lv_obj_t *obj141;
+    lv_obj_t *obj142;
+    lv_obj_t *obj143;
+    lv_obj_t *obj144;
+    lv_obj_t *obj145;
+    lv_obj_t *obj146;
+    lv_obj_t *obj147;
+    lv_obj_t *obj148;
+    lv_obj_t *obj149;
+    lv_obj_t *obj150;
+    lv_obj_t *obj151;
+    lv_obj_t *obj152;
+    lv_obj_t *obj153;
+    lv_obj_t *obj154;
+    lv_obj_t *obj155;
+    lv_obj_t *obj156;
+    lv_obj_t *obj157;
+    lv_obj_t *obj158;
+    lv_obj_t *obj159;
+    lv_obj_t *obj160;
+    lv_obj_t *obj161;
+    lv_obj_t *obj162;
+    lv_obj_t *obj163;
+    lv_obj_t *obj164;
+    lv_obj_t *obj165;
+    lv_obj_t *obj166;
+    lv_obj_t *obj167;
+    lv_obj_t *obj168;
+    lv_obj_t *obj169;
+    lv_obj_t *obj170;
+    lv_obj_t *obj171;
+    lv_obj_t *obj172;
+    lv_obj_t *obj173;
+    lv_obj_t *obj174;
+    lv_obj_t *obj175;
+    lv_obj_t *obj176;
+    lv_obj_t *obj177;
+    lv_obj_t *obj178;
+    lv_obj_t *obj179;
+    lv_obj_t *top_bar_3;
+    lv_obj_t *spoolbuddy_logo_3;
+    lv_obj_t *printer_select_3;
+    lv_obj_t *wifi_signal_3;
+    lv_obj_t *notification_bell_3;
+    lv_obj_t *clock_3;
+    lv_obj_t *obj180;
+    lv_obj_t *obj181;
+    lv_obj_t *obj182;
+    lv_obj_t *obj183;
+    lv_obj_t *obj184;
+    lv_obj_t *obj185;
+    lv_obj_t *obj186;
+    lv_obj_t *obj187;
+    lv_obj_t *obj188;
+    lv_obj_t *obj189;
+    lv_obj_t *obj190;
+    lv_obj_t *obj191;
+    lv_obj_t *obj192;
+    lv_obj_t *obj193;
+    lv_obj_t *obj194;
+    lv_obj_t *obj195;
+    lv_obj_t *obj196;
+    lv_obj_t *obj197;
+    lv_obj_t *obj198;
+    lv_obj_t *obj199;
+    lv_obj_t *obj200;
+    lv_obj_t *obj201;
+    lv_obj_t *obj202;
+    lv_obj_t *obj203;
+    lv_obj_t *obj204;
+    lv_obj_t *obj205;
+    lv_obj_t *obj206;
+    lv_obj_t *obj207;
+    lv_obj_t *obj208;
+    lv_obj_t *obj209;
+    lv_obj_t *obj210;
+    lv_obj_t *obj211;
+    lv_obj_t *obj212;
+    lv_obj_t *obj213;
+    lv_obj_t *obj214;
+    lv_obj_t *obj215;
+    lv_obj_t *obj216;
+} objects_t;
+
+extern objects_t objects;
+
+enum ScreensEnum {
+    SCREEN_ID_MAIN = 1,
+    SCREEN_ID_AMS_OVERVIEW = 2,
+    SCREEN_ID_SCAN_RESULT = 3,
+    SCREEN_ID_SPOOL_DETAILS = 4,
+};
+
+void create_screen_main();
+void tick_screen_main();
+
+void create_screen_ams_overview();
+void tick_screen_ams_overview();
+
+void create_screen_scan_result();
+void tick_screen_scan_result();
+
+void create_screen_spool_details();
+void tick_screen_spool_details();
+
+void tick_screen_by_id(enum ScreensEnum screenId);
+void tick_screen(int screen_index);
+
+void create_screens();
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /*EEZ_LVGL_UI_SCREENS_H*/

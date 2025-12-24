@@ -54,6 +54,9 @@ Cargo.lock
 # Misc artifacts
 =*
 
+# EEZ Studio UI state (transient)
+*.eez-project-ui-state
+
 # Claude code
 CLAUDE.md
 SPOOLBUDDY_PLAN.md
