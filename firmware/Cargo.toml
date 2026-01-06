@@ -1,6 +1,6 @@
 [package]
 name = "spoolbuddy-firmware"
-version = "0.1.1-beta.2"
+version = "0.1.1-beta.3"
 edition = "2021"
 license = "MIT"
 rust-version = "1.77"

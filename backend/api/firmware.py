@@ -218,6 +218,11 @@ async def check_firmware_update(current_version: Optional[str] = None):
 
         if current_version:
             result.update_available = _compare_versions(current_version, best_version)
+        else:
+            # Device version unknown - offer update if firmware is available
+            # This handles devices running old firmware without version reporting
+            result.update_available = True
+            logger.info(f"Device version unknown, offering update to {best_version}")
     else:
         result.error = "No firmware available (local or GitHub)"
 

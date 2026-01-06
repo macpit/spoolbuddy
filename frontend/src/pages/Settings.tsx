@@ -748,7 +748,7 @@ export function Settings() {
                        deviceConnected ? (
                         deviceFirmwareVersion || firmwareCheck?.current_version
                           ? `v${deviceFirmwareVersion || firmwareCheck?.current_version}`
-                          : 'Version unknown - reboot device to report'
+                          : 'Version unknown - update to enable reporting'
                        ) : 'Connect device via WiFi'}
                     </p>
                   </div>
@@ -787,8 +787,10 @@ export function Settings() {
                       Update Available: v{firmwareCheck.latest_version}
                     </p>
                     <p class="text-sm text-[var(--text-secondary)] mt-1">
-                      Your device is running v{deviceFirmwareVersion || firmwareCheck.current_version || 'unknown'}.
-                      Click update to install the new firmware.
+                      {deviceFirmwareVersion || firmwareCheck?.current_version
+                        ? `Your device is running v${deviceFirmwareVersion || firmwareCheck.current_version}.`
+                        : 'Your device is running an older version without version reporting.'}
+                      {' '}Click update to install the new firmware.
                     </p>
                     <div class="mt-3 p-3 bg-[var(--bg-secondary)] rounded text-xs text-[var(--text-muted)]">
                       <p class="font-medium mb-1">What will happen:</p>
