@@ -71,7 +71,7 @@ add_subdirectory(lvgl)
 file(GLOB UI_SOURCES "ui/*.c")
 
 # Main executable sources
-set(SIMULATOR_SOURCES main.c sim_mocks.c ${UI_SOURCES})
+set(SIMULATOR_SOURCES main.c ${UI_SOURCES})
 if(ENABLE_BACKEND_CLIENT)
     list(APPEND SIMULATOR_SOURCES backend_client.c)
 endif()

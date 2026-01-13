@@ -12,6 +12,7 @@
 #include "ui.h"
 #include "ui_internal.h"
 #include "ui_nfc.h"
+#include "ui_nfc_card.h"
 #include "screens.h"
 #include "images.h"
 #include "actions.h"
@@ -240,6 +241,7 @@ void delete_all_screens(void) {
     // Clear module state via cleanup functions
     ui_wifi_cleanup();
     ui_printer_cleanup();
+    ui_nfc_card_cleanup();       // Clear NFC card dynamic elements
     reset_notification_state();  // Clear notification dots before deleting screens
     reset_backend_ui_state();    // Clear all dynamic UI state (AMS widgets, labels, etc.)
 
@@ -280,6 +282,7 @@ void ui_init() {
     // Create main screen
     create_screen_main_screen();
     wire_main_buttons();
+    ui_nfc_card_init();
     loadScreen(SCREEN_ID_MAIN_SCREEN);
 }
 
@@ -313,6 +316,7 @@ void ui_tick() {
             case SCREEN_ID_MAIN_SCREEN:
                 create_screen_main_screen();
                 wire_main_buttons();
+                ui_nfc_card_init();
                 break;
             case SCREEN_ID_AMS_OVERVIEW:
                 create_screen_ams_overview();
@@ -321,6 +325,7 @@ void ui_tick() {
             case SCREEN_ID_SCAN_RESULT:
                 create_screen_scan_result();
                 wire_scan_result_buttons();
+                ui_scan_result_init();
                 break;
             case SCREEN_ID_SPOOL_DETAILS:
                 create_screen_spool_details();
@@ -384,9 +389,15 @@ void ui_tick() {
         update_backend_ui();
         UI_LOGI("update_backend_ui returned");
 
-        // Update NFC status on scan_result screen
+        // Update NFC card on main screen
+        if (screen_id == SCREEN_ID_MAIN_SCREEN) {
+            ui_nfc_card_update();
+        }
+
+        // Update NFC status and weight on scan_result screen
         if (screen_id == SCREEN_ID_SCAN_RESULT) {
             ui_nfc_update();
+            ui_scan_result_update();
         }
 
         // Update WiFi icon for CURRENT screen only (other screen objects are freed)

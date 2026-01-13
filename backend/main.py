@@ -47,6 +47,12 @@ _display_pending_command: Optional[str] = None
 _display_firmware_version: Optional[str] = None
 # Device reports update is available
 _device_update_available: bool = False
+# Device state (weight, tag) - updated by WebSocket messages from device
+_device_last_weight: Optional[float] = None
+_device_weight_stable: bool = False
+_device_current_tag_id: Optional[str] = None
+# Decoded tag data from last tag_detected event
+_device_tag_data: Optional[Dict] = None
 
 
 def _get_local_ip() -> str:
@@ -450,13 +456,35 @@ async def display_status():
         "last_seen": _display_last_seen if _display_last_seen > 0 else None,
         "firmware_version": _display_firmware_version,
         "update_available": _device_update_available,
+        "weight": _device_last_weight,
+        "weight_stable": _device_weight_stable,
+        "tag_id": _device_current_tag_id,
+        "tag_data": _device_tag_data,
     }
+
+
+@app.post("/api/display/state")
+async def update_device_state(
+    weight: Optional[float] = None,
+    stable: Optional[bool] = None,
+    tag_id: Optional[str] = None
+):
+    """HTTP endpoint for device to update state (alternative to WebSocket)."""
+    update_display_heartbeat()
+    await handle_device_state({
+        "weight": weight,
+        "stable": stable if stable is not None else False,
+        "tag_id": tag_id,
+    })
+    return {"ok": True}
 
 
 async def handle_tag_detected(websocket: WebSocket, message: dict):
     """Handle tag_detected message from device."""
+    global _device_tag_data, _device_current_tag_id
     uid_hex = message.get("uid", "")
     tag_type = message.get("tag_type", "")  # "NTAG", "MifareClassic1K", etc.
+    _device_current_tag_id = uid_hex
 
     # Data depends on tag type
     ndef_url = message.get("ndef_url")  # For NTAG with URL
@@ -496,6 +524,38 @@ async def handle_tag_detected(websocket: WebSocket, message: dict):
             if spool_data:
                 logger.info(f"New tag detected: {spool_data.material} {spool_data.color_name}")
 
+        # Store decoded tag data for HTTP polling
+        _device_tag_data = {
+            "uid": result.uid,
+            "tag_type": result.tag_type.value,
+        }
+        # Extract normalized spool data from decoded result
+        if result.spoolease_data:
+            d = result.spoolease_data
+            _device_tag_data["vendor"] = d.brand or ""
+            _device_tag_data["material"] = d.material or ""
+            _device_tag_data["subtype"] = d.material_subtype or ""
+            _device_tag_data["color_name"] = d.color_name or ""
+            _device_tag_data["color_rgba"] = int(d.color_code + "FF", 16) if d.color_code and len(d.color_code) == 6 else 0
+            _device_tag_data["spool_weight"] = d.weight_label or 0
+        elif result.bambulab_data:
+            d = result.bambulab_data
+            _device_tag_data["vendor"] = "Bambu"
+            _device_tag_data["material"] = d.tray_type or ""
+            _device_tag_data["subtype"] = d.tray_sub_brands or ""
+            _device_tag_data["color_name"] = ""
+            _device_tag_data["color_rgba"] = d.tray_color if d.tray_color else 0
+            _device_tag_data["spool_weight"] = d.spool_weight or 0
+        elif result.openprinttag_data:
+            d = result.openprinttag_data
+            _device_tag_data["vendor"] = d.brand or ""
+            _device_tag_data["material"] = d.material_type or ""
+            _device_tag_data["subtype"] = ""
+            _device_tag_data["color_name"] = ""
+            color_hex = d.color_hex or ""
+            _device_tag_data["color_rgba"] = int(color_hex + "FF", 16) if len(color_hex) == 6 else 0
+            _device_tag_data["spool_weight"] = 0
+
         # Send result back to all clients
         response = {
             "type": "tag_result",
@@ -514,11 +574,90 @@ async def handle_tag_detected(websocket: WebSocket, message: dict):
             response["openprinttag_data"] = result.openprinttag_data.model_dump()
 
         await broadcast_message(response)
+    else:
+        # No decoded data, just store UID
+        _device_tag_data = {"uid": uid_hex, "tag_type": tag_type}
+
+
+async def handle_device_state(message: dict):
+    """Handle device_state message from device (weight, tag info)."""
+    global _device_last_weight, _device_weight_stable, _device_current_tag_id, _device_tag_data
+
+    weight = message.get("weight")
+    stable = message.get("stable", False)
+    tag_id = message.get("tag_id")
+
+    state_changed = False
+
+    if weight is not None and weight != _device_last_weight:
+        _device_last_weight = weight
+        state_changed = True
+
+    if stable != _device_weight_stable:
+        _device_weight_stable = stable
+        state_changed = True
+
+    if tag_id != _device_current_tag_id:
+        _device_current_tag_id = tag_id
+        state_changed = True
+
+        # Try to look up spool data from database by tag_id
+        if tag_id:
+            try:
+                db = await get_db()
+                spools = await db.list_spools()
+                tag_id_normalized = tag_id.replace(":", "").upper()
+
+                for spool in spools:
+                    spool_tag = spool.tag_id if hasattr(spool, 'tag_id') else spool.get('tag_id', '')
+                    if spool_tag:
+                        if spool_tag.replace(":", "").upper() == tag_id_normalized:
+                            # Found matching spool
+                            spool_dict = spool.model_dump() if hasattr(spool, 'model_dump') else dict(spool)
+                            _device_tag_data = {
+                                "uid": tag_id,
+                                "tag_type": spool_dict.get("tag_type", "database"),
+                                "vendor": spool_dict.get("brand", ""),
+                                "material": spool_dict.get("material", ""),
+                                "subtype": spool_dict.get("subtype", ""),
+                                "color_name": spool_dict.get("color_name", ""),
+                                "spool_weight": spool_dict.get("label_weight", 0),
+                            }
+                            # Convert RGBA hex to int
+                            rgba_str = spool_dict.get("rgba", "")
+                            if rgba_str and len(rgba_str) >= 6:
+                                try:
+                                    if len(rgba_str) == 6:
+                                        rgba_str = rgba_str + "FF"
+                                    _device_tag_data["color_rgba"] = int(rgba_str, 16)
+                                except ValueError:
+                                    _device_tag_data["color_rgba"] = 0
+                            logger.info(f"Tag {tag_id} matched to spool: {spool_dict.get('material')} {spool_dict.get('color_name')}")
+                            break
+                else:
+                    # No matching spool found, clear tag data
+                    _device_tag_data = {"uid": tag_id, "tag_type": "unknown"}
+            except Exception as e:
+                logger.warning(f"Error looking up spool for tag {tag_id}: {e}")
+                _device_tag_data = {"uid": tag_id, "tag_type": "unknown"}
+        else:
+            # Tag removed
+            _device_tag_data = None
+
+    # Broadcast state update to all clients
+    if state_changed:
+        await broadcast_message({
+            "type": "device_state",
+            "weight": _device_last_weight,
+            "stable": _device_weight_stable,
+            "tag_id": _device_current_tag_id,
+        })
 
 
 @app.websocket("/ws/ui")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time UI updates."""
+    global _device_current_tag_id, _device_tag_data
     await websocket.accept()
     websocket_clients.add(websocket)
     logger.info("WebSocket client connected")
@@ -532,9 +671,9 @@ async def websocket_endpoint(websocket: WebSocket):
             "device": {
                 "connected": display_connected,
                 "update_available": _device_update_available,
-                "last_weight": None,
-                "weight_stable": False,
-                "current_tag_id": None,
+                "last_weight": _device_last_weight,
+                "weight_stable": _device_weight_stable,
+                "current_tag_id": _device_current_tag_id,
             },
             "printers": {
                 serial: conn.connected
@@ -557,7 +696,11 @@ async def websocket_endpoint(websocket: WebSocket):
                 if msg_type == "tag_detected":
                     await handle_tag_detected(websocket, message)
                 elif msg_type == "tag_removed":
+                    _device_current_tag_id = None
+                    _device_tag_data = None
                     await broadcast_message({"type": "tag_removed"})
+                elif msg_type == "device_state":
+                    await handle_device_state(message)
                 else:
                     logger.debug(f"Received from WebSocket: {data}")
 

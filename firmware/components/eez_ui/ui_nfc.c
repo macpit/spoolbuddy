@@ -15,7 +15,7 @@ extern uint8_t nfc_get_uid(uint8_t *buf, uint8_t buf_len);
 extern uint8_t nfc_get_uid_hex(uint8_t *buf, uint8_t buf_len);
 
 static bool last_tag_present = false;
-static char uid_str[32] = {0};
+static char uid_str[48] = {0};
 
 /**
  * Poll NFC status and update scan_result screen

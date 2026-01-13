@@ -353,6 +353,139 @@ fn send_heartbeat(base_url: &str) {
     }
 }
 
+/// Send device state to backend (weight, tag) and receive decoded tag data
+/// Returns true if tag data was received and set
+pub fn send_device_state(tag_uid_hex: Option<&str>, weight: f32, stable: bool) -> bool {
+    let manager = BACKEND_MANAGER.lock().unwrap();
+    if manager.server_url.is_empty() {
+        return false;
+    }
+    let base_url = manager.server_url.clone();
+    drop(manager);
+
+    // Build URL with query params
+    let url = if let Some(tag_id) = tag_uid_hex {
+        format!(
+            "{}/api/display/state?weight={:.1}&stable={}&tag_id={}",
+            base_url, weight, stable, tag_id
+        )
+    } else {
+        format!(
+            "{}/api/display/state?weight={:.1}&stable={}",
+            base_url, weight, stable
+        )
+    };
+
+    let config = HttpConfig {
+        timeout: Some(std::time::Duration::from_millis(3000)),
+        ..Default::default()
+    };
+
+    let connection = match EspHttpConnection::new(&config) {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+
+    let mut client = HttpClient::wrap(connection);
+
+    // POST request
+    let request = match client.post(&url, &[]) {
+        Ok(r) => r,
+        Err(_) => return false,
+    };
+
+    let response = match request.submit() {
+        Ok(r) => r,
+        Err(_) => return false,
+    };
+
+    if response.status() != 200 {
+        return false;
+    }
+
+    // If we have a tag, fetch decoded data from display/status
+    if tag_uid_hex.is_some() {
+        fetch_decoded_tag_data(&base_url);
+        return true;
+    }
+
+    false
+}
+
+/// Fetch decoded tag data from backend
+fn fetch_decoded_tag_data(base_url: &str) {
+    let url = format!("{}/api/display/status", base_url);
+
+    let config = HttpConfig {
+        timeout: Some(std::time::Duration::from_millis(3000)),
+        ..Default::default()
+    };
+
+    let connection = match EspHttpConnection::new(&config) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+
+    let mut client = HttpClient::wrap(connection);
+
+    let request = match client.get(&url) {
+        Ok(r) => r,
+        Err(_) => return,
+    };
+
+    let mut response = match request.submit() {
+        Ok(r) => r,
+        Err(_) => return,
+    };
+
+    if response.status() != 200 {
+        return;
+    }
+
+    // Read response
+    let mut body = Vec::new();
+    let mut buf = [0u8; 512];
+    loop {
+        match response.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => body.extend_from_slice(&buf[..n]),
+            Err(_) => return,
+        }
+    }
+
+    // Parse JSON and extract tag_data
+    #[derive(Deserialize)]
+    struct DisplayStatus {
+        tag_data: Option<TagData>,
+    }
+
+    #[derive(Deserialize)]
+    struct TagData {
+        vendor: Option<String>,
+        material: Option<String>,
+        subtype: Option<String>,
+        color_name: Option<String>,
+        color_rgba: Option<u32>,
+        spool_weight: Option<i32>,
+        tag_type: Option<String>,
+    }
+
+    if let Ok(status) = serde_json::from_slice::<DisplayStatus>(&body) {
+        if let Some(tag_data) = status.tag_data {
+            crate::nfc_bridge_manager::set_decoded_tag_data(
+                tag_data.vendor.as_deref().unwrap_or(""),
+                tag_data.material.as_deref().unwrap_or(""),
+                tag_data.subtype.as_deref().unwrap_or(""),
+                tag_data.color_name.as_deref().unwrap_or(""),
+                tag_data.color_rgba.unwrap_or(0),
+                tag_data.spool_weight.unwrap_or(0),
+                tag_data.tag_type.as_deref().unwrap_or(""),
+            );
+            info!("Received decoded tag data from backend");
+        }
+    }
+}
+
 /// Fetch time from backend and update time manager
 /// Can be called independently for quick time sync
 pub fn fetch_and_set_time(base_url: &str) {

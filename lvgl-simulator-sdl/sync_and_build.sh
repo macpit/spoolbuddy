@@ -64,20 +64,14 @@ cp -fv ../eez/src/ui/structs.h ui/
 cp -fv ../eez/src/ui/fonts.h ui/
 cp -fv ../eez/src/ui/vars.h ui/
 cp -fv ../eez/src/ui/actions.h ui/
+cp -fv ../eez/src/ui/ui.h ui/
 cp -f ../eez/src/ui/ui_image_*.c ui/ 2>/dev/null || true
 echo "  Copied $(ls ui/ui_image_*.c 2>/dev/null | wc -l | tr -d ' ') image files"
 
-# Copy custom firmware UI files (these have #ifdef ESP_PLATFORM guards)
-echo "Copying custom firmware UI files..."
-cp -fv ../firmware/components/eez_ui/ui.c ui/
-cp -fv ../firmware/components/eez_ui/ui_backend.c ui/
-cp -fv ../firmware/components/eez_ui/ui_printer.c ui/
-cp -fv ../firmware/components/eez_ui/ui_wifi.c ui/
-cp -fv ../firmware/components/eez_ui/ui_settings.c ui/
-cp -fv ../firmware/components/eez_ui/ui_nvs.c ui/
-cp -fv ../firmware/components/eez_ui/ui_scale.c ui/
-cp -fv ../firmware/components/eez_ui/ui_update.c ui/
-cp -fv ../firmware/components/eez_ui/ui_internal.h ui/
+# NOTE: Custom UI files (ui_backend.c, ui_nfc_card.c, etc.) are developed
+# directly in simulator/ui/ and synced via rsync. They are NOT copied from
+# firmware anymore. See WORKFLOW.md for details.
+# When simulator code is working, manually copy to firmware/components/eez_ui/
 
 echo "=== Applying LVGL 9.x fixes ==="
 

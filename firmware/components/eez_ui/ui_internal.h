@@ -241,6 +241,15 @@ void wire_update_buttons(void);
 void update_firmware_ui(void);
 
 // =============================================================================
+// Module Functions - ui_scan_result.c
+// =============================================================================
+
+void ui_scan_result_init(void);
+void ui_scan_result_update(void);
+int ui_scan_result_get_selected_ams(void);
+int ui_scan_result_get_selected_slot(void);
+
+// =============================================================================
 // Module Functions - ui_core.c (wiring)
 // =============================================================================
 

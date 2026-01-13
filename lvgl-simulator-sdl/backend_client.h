@@ -103,6 +103,9 @@ int backend_poll(void);
 // Send heartbeat to backend (indicates display is connected)
 int backend_send_heartbeat(void);
 
+// Send device state to backend (weight, tag)
+int backend_send_device_state(float weight, bool stable, const char *tag_id);
+
 // Get current backend state (read-only)
 const BackendState *backend_get_state(void);
 
@@ -184,6 +187,31 @@ int time_is_synced(void);
 // =============================================================================
 
 void sync_printers_from_backend(void);
+
+// =============================================================================
+// Spool Inventory functions (calls backend API)
+// =============================================================================
+
+// Check if a spool with given tag_id exists in inventory
+bool spool_exists_by_tag(const char *tag_id);
+
+// Add a new spool to inventory
+// Parameters:
+//   tag_id: NFC tag UID
+//   vendor: Brand name (e.g., "Bambu")
+//   material: Material type (e.g., "PLA")
+//   subtype: Material subtype (e.g., "Basic", "Matte")
+//   color_name: Color name (e.g., "Jade White")
+//   color_rgba: RGBA color value
+//   label_weight: Weight on spool label in grams (e.g., 1000 for 1kg)
+//   weight_current: Current weight from scale in grams
+//   data_origin: Origin of data (e.g., "nfc_scan", "manual")
+//   tag_type: NFC tag type (e.g., "bambu", "generic")
+// Returns true on success, false on failure
+bool spool_add_to_inventory(const char *tag_id, const char *vendor, const char *material,
+                            const char *subtype, const char *color_name, uint32_t color_rgba,
+                            int label_weight, int weight_current, const char *data_origin,
+                            const char *tag_type);
 
 // =============================================================================
 // OTA functions (mocked in simulator - implemented in sim_mocks.c)

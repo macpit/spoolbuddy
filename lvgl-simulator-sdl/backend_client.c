@@ -22,6 +22,21 @@ static BackendState g_state = {0};
 static char g_base_url[256] = BACKEND_DEFAULT_URL;
 static CURL *g_curl = NULL;
 
+// NFC state (synced from real device via backend, or toggled with 'N' key)
+static bool g_nfc_initialized = true;
+static bool g_nfc_tag_present = false;
+static uint8_t g_nfc_uid[7] = {0x87, 0x0D, 0x51, 0x00, 0x00, 0x00, 0x00};
+static uint8_t g_nfc_uid_len = 4;
+
+// Decoded tag data - synced from backend
+static char g_tag_vendor[32] = "";
+static char g_tag_material[32] = "";
+static char g_tag_material_subtype[32] = "";
+static char g_tag_color_name[32] = "";
+static uint32_t g_tag_color_rgba = 0;
+static int g_tag_spool_weight = 0;
+static char g_tag_type[32] = "";
+
 // Response buffer for curl
 typedef struct {
     char *data;
@@ -244,6 +259,34 @@ int backend_send_heartbeat(void) {
     return -1;
 }
 
+int backend_send_device_state(float weight, bool stable, const char *tag_id) {
+    if (!g_curl) return -1;
+
+    char url[512];
+    if (tag_id && tag_id[0]) {
+        snprintf(url, sizeof(url), "%s/api/display/state?weight=%.1f&stable=%s&tag_id=%s",
+                 g_base_url, weight, stable ? "true" : "false", tag_id);
+    } else {
+        snprintf(url, sizeof(url), "%s/api/display/state?weight=%.1f&stable=%s",
+                 g_base_url, weight, stable ? "true" : "false");
+    }
+
+    ResponseBuffer response = {0};
+
+    curl_easy_reset(g_curl);
+    curl_easy_setopt(g_curl, CURLOPT_URL, url);
+    curl_easy_setopt(g_curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(g_curl, CURLOPT_POSTFIELDS, "");
+    curl_easy_setopt(g_curl, CURLOPT_WRITEFUNCTION, write_callback);
+    curl_easy_setopt(g_curl, CURLOPT_WRITEDATA, &response);
+    curl_easy_setopt(g_curl, CURLOPT_TIMEOUT, 2L);
+
+    CURLcode res = curl_easy_perform(g_curl);
+    free(response.data);
+
+    return (res == CURLE_OK) ? 0 : -1;
+}
+
 int backend_poll(void) {
     // Send heartbeat first
     backend_send_heartbeat();
@@ -293,12 +336,66 @@ int backend_poll(void) {
 
     cJSON_Delete(json);
 
-    // Fetch device status
+    // Fetch device status (includes real device's tag data)
     snprintf(url, sizeof(url), "%s/api/display/status", g_base_url);
     json = fetch_json(url);
     if (json) {
         cJSON *item = cJSON_GetObjectItem(json, "connected");
         g_state.device.display_connected = item ? cJSON_IsTrue(item) : false;
+
+        // Sync NFC state from real device
+        cJSON *tag_data = cJSON_GetObjectItem(json, "tag_data");
+        if (tag_data && !cJSON_IsNull(tag_data)) {
+            // Real device has a tag - sync to simulator
+            g_nfc_tag_present = true;
+
+            item = cJSON_GetObjectItem(tag_data, "uid");
+            if (item && item->valuestring) {
+                // Parse UID hex string into bytes
+                const char *uid_str = item->valuestring;
+                g_nfc_uid_len = 0;
+                for (int i = 0; uid_str[i] && uid_str[i+1] && g_nfc_uid_len < 7; i += 2) {
+                    if (uid_str[i] == ':') { i--; continue; }
+                    char hex[3] = {uid_str[i], uid_str[i+1], 0};
+                    g_nfc_uid[g_nfc_uid_len++] = (uint8_t)strtol(hex, NULL, 16);
+                }
+            }
+
+            item = cJSON_GetObjectItem(tag_data, "vendor");
+            if (item && item->valuestring) strncpy(g_tag_vendor, item->valuestring, sizeof(g_tag_vendor) - 1);
+
+            item = cJSON_GetObjectItem(tag_data, "material");
+            if (item && item->valuestring) strncpy(g_tag_material, item->valuestring, sizeof(g_tag_material) - 1);
+
+            item = cJSON_GetObjectItem(tag_data, "subtype");
+            if (item && item->valuestring) strncpy(g_tag_material_subtype, item->valuestring, sizeof(g_tag_material_subtype) - 1);
+
+            item = cJSON_GetObjectItem(tag_data, "color_name");
+            if (item && item->valuestring) strncpy(g_tag_color_name, item->valuestring, sizeof(g_tag_color_name) - 1);
+
+            item = cJSON_GetObjectItem(tag_data, "color_rgba");
+            if (item) g_tag_color_rgba = (uint32_t)item->valueint;
+
+            item = cJSON_GetObjectItem(tag_data, "spool_weight");
+            if (item) g_tag_spool_weight = item->valueint;
+
+            item = cJSON_GetObjectItem(tag_data, "tag_type");
+            if (item && item->valuestring) strncpy(g_tag_type, item->valuestring, sizeof(g_tag_type) - 1);
+        } else {
+            // No tag on real device - clear simulator NFC state (unless manually toggled)
+            // Only clear if we were syncing from real device
+            if (g_nfc_tag_present && g_tag_vendor[0] != '\0') {
+                g_nfc_tag_present = false;
+                g_tag_vendor[0] = '\0';
+                g_tag_material[0] = '\0';
+                g_tag_material_subtype[0] = '\0';
+                g_tag_color_name[0] = '\0';
+                g_tag_color_rgba = 0;
+                g_tag_spool_weight = 0;
+                g_tag_type[0] = '\0';
+            }
+        }
+
         cJSON_Delete(json);
     }
 
@@ -555,4 +652,367 @@ int time_get_hhmm(void) {
 
 int time_is_synced(void) {
     return 1;  // Simulator always has valid time
+}
+
+// =============================================================================
+// Spool Inventory API
+// =============================================================================
+
+bool spool_exists_by_tag(const char *tag_id) {
+    if (!tag_id || !g_curl) return false;
+
+    char url[512];
+    snprintf(url, sizeof(url), "%s/api/spools", g_base_url);
+
+    ResponseBuffer response = {0};
+
+    curl_easy_reset(g_curl);
+    curl_easy_setopt(g_curl, CURLOPT_URL, url);
+    curl_easy_setopt(g_curl, CURLOPT_WRITEFUNCTION, write_callback);
+    curl_easy_setopt(g_curl, CURLOPT_WRITEDATA, &response);
+    curl_easy_setopt(g_curl, CURLOPT_TIMEOUT, 5L);
+
+    CURLcode res = curl_easy_perform(g_curl);
+
+    bool found = false;
+    if (res == CURLE_OK && response.data) {
+        cJSON *json = cJSON_Parse(response.data);
+        if (json && cJSON_IsArray(json)) {
+            int count = cJSON_GetArraySize(json);
+            for (int i = 0; i < count; i++) {
+                cJSON *spool = cJSON_GetArrayItem(json, i);
+                cJSON *tid = cJSON_GetObjectItem(spool, "tag_id");
+                if (tid && tid->valuestring && strcmp(tid->valuestring, tag_id) == 0) {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        cJSON_Delete(json);
+    }
+
+    free(response.data);
+    return found;
+}
+
+bool spool_add_to_inventory(const char *tag_id, const char *vendor, const char *material,
+                            const char *subtype, const char *color_name, uint32_t color_rgba,
+                            int label_weight, int weight_current, const char *data_origin,
+                            const char *tag_type) {
+    if (!g_curl) {
+        printf("[backend] spool_add_to_inventory: curl not initialized\n");
+        return false;
+    }
+
+    char url[512];
+    snprintf(url, sizeof(url), "%s/api/spools", g_base_url);
+
+    // Build JSON body
+    cJSON *json = cJSON_CreateObject();
+    if (tag_id) cJSON_AddStringToObject(json, "tag_id", tag_id);
+    cJSON_AddStringToObject(json, "material", material ? material : "Unknown");
+    if (subtype && subtype[0]) cJSON_AddStringToObject(json, "subtype", subtype);
+    if (vendor) cJSON_AddStringToObject(json, "brand", vendor);
+    if (color_name) cJSON_AddStringToObject(json, "color_name", color_name);
+
+    // Convert RGBA to hex string (RRGGBBAA format)
+    char rgba_hex[16];
+    snprintf(rgba_hex, sizeof(rgba_hex), "%08X", color_rgba);
+    cJSON_AddStringToObject(json, "rgba", rgba_hex);
+
+    cJSON_AddNumberToObject(json, "label_weight", label_weight);
+    cJSON_AddNumberToObject(json, "weight_new", label_weight);  // New spool, same as label
+    if (weight_current > 0) {
+        cJSON_AddNumberToObject(json, "weight_current", weight_current);
+    }
+    if (data_origin && data_origin[0]) cJSON_AddStringToObject(json, "data_origin", data_origin);
+    if (tag_type && tag_type[0]) cJSON_AddStringToObject(json, "tag_type", tag_type);
+
+    char *body = cJSON_PrintUnformatted(json);
+    cJSON_Delete(json);
+
+    if (!body) {
+        printf("[backend] spool_add_to_inventory: failed to create JSON\n");
+        return false;
+    }
+
+    ResponseBuffer response = {0};
+
+    struct curl_slist *headers = NULL;
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+
+    curl_easy_reset(g_curl);
+    curl_easy_setopt(g_curl, CURLOPT_URL, url);
+    curl_easy_setopt(g_curl, CURLOPT_POSTFIELDS, body);
+    curl_easy_setopt(g_curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(g_curl, CURLOPT_WRITEFUNCTION, write_callback);
+    curl_easy_setopt(g_curl, CURLOPT_WRITEDATA, &response);
+    curl_easy_setopt(g_curl, CURLOPT_TIMEOUT, 5L);
+
+    CURLcode res = curl_easy_perform(g_curl);
+
+    long http_code = 0;
+    curl_easy_getinfo(g_curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+    curl_slist_free_all(headers);
+    free(body);
+
+    bool success = (res == CURLE_OK && http_code == 201);
+
+    if (success) {
+        printf("[backend] Spool added to inventory: tag=%s\n", tag_id);
+    } else {
+        printf("[backend] Failed to add spool: HTTP %ld, curl %d\n", http_code, res);
+        if (response.data) {
+            printf("[backend] Response: %s\n", response.data);
+        }
+    }
+
+    free(response.data);
+    return success;
+}
+
+// =============================================================================
+// NFC Hardware Simulation (keyboard toggle in simulator)
+// =============================================================================
+
+// Note: NFC state variables are declared at top of file for use by backend_poll()
+
+bool nfc_is_initialized(void) {
+    return g_nfc_initialized;
+}
+
+bool nfc_tag_present(void) {
+    return g_nfc_tag_present;
+}
+
+uint8_t nfc_get_uid_len(void) {
+    return g_nfc_tag_present ? g_nfc_uid_len : 0;
+}
+
+uint8_t nfc_get_uid(uint8_t *buf, uint8_t buf_len) {
+    if (!g_nfc_tag_present || buf == NULL) return 0;
+    uint8_t len = g_nfc_uid_len < buf_len ? g_nfc_uid_len : buf_len;
+    memcpy(buf, g_nfc_uid, len);
+    return len;
+}
+
+uint8_t nfc_get_uid_hex(uint8_t *buf, uint8_t buf_len) {
+    if (!g_nfc_tag_present || buf == NULL || buf_len < 3) return 0;
+    int pos = 0;
+    for (int i = 0; i < g_nfc_uid_len && pos < buf_len - 3; i++) {
+        if (i > 0) buf[pos++] = ':';
+        pos += snprintf((char*)&buf[pos], buf_len - pos, "%02X", g_nfc_uid[i]);
+    }
+    return pos;
+}
+
+// Fetch decoded tag data from backend
+static void fetch_tag_data_from_backend(const char *tag_uid_hex) {
+    if (!g_curl || !tag_uid_hex) return;
+
+    char url[512];
+    snprintf(url, sizeof(url), "%s/api/tags/decode?uid=%s", g_base_url, tag_uid_hex);
+
+    ResponseBuffer response = {0};
+
+    curl_easy_reset(g_curl);
+    curl_easy_setopt(g_curl, CURLOPT_URL, url);
+    curl_easy_setopt(g_curl, CURLOPT_WRITEFUNCTION, write_callback);
+    curl_easy_setopt(g_curl, CURLOPT_WRITEDATA, &response);
+    curl_easy_setopt(g_curl, CURLOPT_TIMEOUT, 2L);
+
+    CURLcode res = curl_easy_perform(g_curl);
+
+    if (res == CURLE_OK && response.data) {
+        cJSON *json = cJSON_Parse(response.data);
+        if (json) {
+            cJSON *item;
+
+            item = cJSON_GetObjectItem(json, "vendor");
+            if (item && item->valuestring) strncpy(g_tag_vendor, item->valuestring, sizeof(g_tag_vendor) - 1);
+
+            item = cJSON_GetObjectItem(json, "material");
+            if (item && item->valuestring) strncpy(g_tag_material, item->valuestring, sizeof(g_tag_material) - 1);
+
+            item = cJSON_GetObjectItem(json, "subtype");
+            if (item && item->valuestring) strncpy(g_tag_material_subtype, item->valuestring, sizeof(g_tag_material_subtype) - 1);
+
+            item = cJSON_GetObjectItem(json, "color_name");
+            if (item && item->valuestring) strncpy(g_tag_color_name, item->valuestring, sizeof(g_tag_color_name) - 1);
+
+            item = cJSON_GetObjectItem(json, "color_rgba");
+            if (item) g_tag_color_rgba = (uint32_t)item->valueint;
+
+            item = cJSON_GetObjectItem(json, "spool_weight");
+            if (item) g_tag_spool_weight = item->valueint;
+
+            item = cJSON_GetObjectItem(json, "tag_type");
+            if (item && item->valuestring) strncpy(g_tag_type, item->valuestring, sizeof(g_tag_type) - 1);
+
+            cJSON_Delete(json);
+            printf("[backend] Tag data fetched: %s %s %s\n", g_tag_vendor, g_tag_material, g_tag_color_name);
+        }
+    }
+
+    free(response.data);
+}
+
+void sim_set_nfc_tag_present(bool present) {
+    bool was_present = g_nfc_tag_present;
+    g_nfc_tag_present = present;
+    printf("[sim] NFC tag %s\n", present ? "DETECTED" : "REMOVED");
+
+    if (present && !was_present) {
+        // Tag just appeared - fetch decoded data from backend
+        char uid_hex[32];
+        nfc_get_uid_hex((uint8_t*)uid_hex, sizeof(uid_hex));
+        fetch_tag_data_from_backend(uid_hex);
+    } else if (!present) {
+        // Tag removed - clear cached data
+        g_tag_vendor[0] = '\0';
+        g_tag_material[0] = '\0';
+        g_tag_material_subtype[0] = '\0';
+        g_tag_color_name[0] = '\0';
+        g_tag_color_rgba = 0;
+        g_tag_spool_weight = 0;
+        g_tag_type[0] = '\0';
+    }
+}
+
+void sim_set_nfc_uid(uint8_t *uid, uint8_t len) {
+    g_nfc_uid_len = len < 7 ? len : 7;
+    memcpy(g_nfc_uid, uid, g_nfc_uid_len);
+}
+
+bool sim_get_nfc_tag_present(void) {
+    return g_nfc_tag_present;
+}
+
+// Decoded tag data getters
+const char* nfc_get_tag_vendor(void) {
+    return g_nfc_tag_present ? g_tag_vendor : "";
+}
+
+const char* nfc_get_tag_material(void) {
+    return g_nfc_tag_present ? g_tag_material : "";
+}
+
+const char* nfc_get_tag_material_subtype(void) {
+    return g_nfc_tag_present ? g_tag_material_subtype : "";
+}
+
+const char* nfc_get_tag_color_name(void) {
+    return g_nfc_tag_present ? g_tag_color_name : "";
+}
+
+uint32_t nfc_get_tag_color_rgba(void) {
+    return g_nfc_tag_present ? g_tag_color_rgba : 0;
+}
+
+int nfc_get_tag_spool_weight(void) {
+    return g_nfc_tag_present ? g_tag_spool_weight : 0;
+}
+
+const char* nfc_get_tag_type(void) {
+    return g_nfc_tag_present ? g_tag_type : "";
+}
+
+// =============================================================================
+// WiFi Stubs (simulator doesn't have real WiFi)
+// =============================================================================
+
+// WiFi types (matching ui_internal.h)
+typedef struct {
+    int state;       // 0=Uninitialized, 1=Disconnected, 2=Connecting, 3=Connected, 4=Error
+    uint8_t ip[4];   // IP address when connected
+    int8_t rssi;     // Signal strength in dBm (when connected)
+} WifiStatus;
+
+typedef struct {
+    char ssid[33];   // SSID (null-terminated)
+    int8_t rssi;     // Signal strength in dBm
+    uint8_t auth_mode; // 0=Open, 1=WEP, 2=WPA, 3=WPA2, 4=WPA3
+} WifiScanResult;
+
+static int g_wifi_state = 3;  // Connected
+static char g_wifi_ssid[33] = "SimulatorWiFi";
+
+void wifi_get_status(WifiStatus *status) {
+    if (status) {
+        status->state = g_wifi_state;
+        status->ip[0] = 192; status->ip[1] = 168; status->ip[2] = 1; status->ip[3] = 100;
+        status->rssi = -45;
+    }
+}
+
+int wifi_get_ssid(char *buf, int buf_len) {
+    strncpy(buf, g_wifi_ssid, buf_len - 1);
+    buf[buf_len - 1] = '\0';
+    return strlen(buf);
+}
+
+int wifi_connect(const char *ssid, const char *password) {
+    (void)password;
+    printf("[sim] WiFi connect: %s\n", ssid);
+    strncpy(g_wifi_ssid, ssid, sizeof(g_wifi_ssid) - 1);
+    g_wifi_state = 3;
+    return 0;
+}
+
+int wifi_disconnect(void) {
+    printf("[sim] WiFi disconnect\n");
+    g_wifi_state = 1;
+    return 0;
+}
+
+int wifi_scan(WifiScanResult *results, int max_results) {
+    if (max_results < 1) return 0;
+    strncpy(results[0].ssid, "SimNetwork1", 32);
+    results[0].rssi = -45;
+    results[0].auth_mode = 3;
+
+    if (max_results < 2) return 1;
+    strncpy(results[1].ssid, "SimNetwork2", 32);
+    results[1].rssi = -60;
+    results[1].auth_mode = 0;
+
+    return 2;
+}
+
+// =============================================================================
+// OTA Stubs (simulator doesn't do real OTA)
+// =============================================================================
+
+int ota_is_update_available(void) { return 0; }
+int ota_get_current_version(char *buf, int buf_len) {
+    const char *ver = "0.1.1-sim";
+    strncpy(buf, ver, buf_len - 1);
+    buf[buf_len - 1] = '\0';
+    return strlen(ver);
+}
+int ota_get_update_version(char *buf, int buf_len) {
+    buf[0] = '\0';
+    return 0;
+}
+int ota_get_state(void) { return 0; }
+int ota_get_progress(void) { return 0; }
+int ota_check_for_update(void) { return 0; }
+int ota_start_update(void) { return -1; }
+
+// =============================================================================
+// Simulator Help
+// =============================================================================
+
+void sim_print_help(void) {
+    printf("\n");
+    printf("=== Simulator Keyboard Controls ===\n");
+    printf("  N     - Toggle NFC tag present\n");
+    printf("  +/=   - Increase scale weight by 50g\n");
+    printf("  -     - Decrease scale weight by 50g\n");
+    printf("  S     - Toggle scale initialized\n");
+    printf("  H     - Show this help\n");
+    printf("  ESC   - Exit simulator\n");
+    printf("===================================\n");
+    printf("\n");
 }

@@ -647,23 +647,21 @@ static lv_obj_t* create_slot(lv_obj_t *parent, int x, int y, uint32_t rgba, bool
         lv_obj_set_style_border_color(slot, lv_color_hex(0x000000), 0);
         lv_obj_set_style_border_opa(slot, 80, 0);
     } else {
-        // Empty slot: darker background
+        // Empty slot: darker background with striping pattern
         lv_obj_set_style_bg_color(slot, lv_color_hex(0x0a0a0a), 0);
         lv_obj_set_style_bg_opa(slot, 255, 0);
 
-        // Add prominent diagonal striping lines for empty slots
-        // Use static arrays for each line to avoid shared state issues
-        static lv_point_precise_t line_pts_0[2] = {{0, 8}, {SLOT_SIZE, 2}};
-        static lv_point_precise_t line_pts_1[2] = {{0, 16}, {SLOT_SIZE, 10}};
-        static lv_point_precise_t line_pts_2[2] = {{0, 24}, {SLOT_SIZE, 18}};
-        lv_point_precise_t *all_pts[3] = {line_pts_0, line_pts_1, line_pts_2};
-
+        // Use simple rectangle objects as diagonal stripes (more reliable than lv_line)
+        // Create 3 thin rectangles positioned diagonally
         for (int i = 0; i < 3; i++) {
-            lv_obj_t *line = lv_line_create(slot);
-            lv_line_set_points(line, all_pts[i], 2);
-            lv_obj_set_style_line_color(line, lv_color_hex(0x4a4a4a), 0);
-            lv_obj_set_style_line_width(line, 3, 0);
-            lv_obj_set_style_line_opa(line, 255, 0);
+            lv_obj_t *stripe = lv_obj_create(slot);
+            lv_obj_remove_style_all(stripe);
+            lv_obj_set_size(stripe, SLOT_SIZE + 8, 3);
+            lv_obj_set_pos(stripe, -4, 6 + i * 10);  // Offset positions
+            lv_obj_set_style_bg_color(stripe, lv_color_hex(0x3a3a3a), 0);
+            lv_obj_set_style_bg_opa(stripe, 255, 0);
+            lv_obj_set_style_transform_rotation(stripe, -200, 0);  // Slight angle (0.1 deg units)
+            lv_obj_clear_flag(stripe, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
         }
     }
 

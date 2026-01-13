@@ -19,6 +19,7 @@
 #include "lvgl.h"
 #include "ui/ui.h"
 #include "ui/screens.h"
+#include "sim_control.h"
 
 #ifdef ENABLE_BACKEND_CLIENT
 #include "backend_client.h"
@@ -140,6 +141,12 @@ static void *tick_thread(void *arg)
 static int backend_running = 1;
 static pthread_mutex_t backend_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+// External functions for device state (NFC/scale)
+extern bool nfc_tag_present(void);
+extern uint8_t nfc_get_uid_hex(uint8_t *buf, uint8_t buf_len);
+extern float scale_get_weight(void);
+extern bool scale_is_stable(void);
+
 static void *backend_thread(void *arg)
 {
     (void)arg;
@@ -148,6 +155,16 @@ static void *backend_thread(void *arg)
     while (backend_running) {
         pthread_mutex_lock(&backend_mutex);
         int result = backend_poll();
+
+        // Send device state (NFC tag, scale weight) to backend
+        float weight = scale_get_weight();
+        bool stable = scale_is_stable();
+        char tag_id[32] = {0};
+        if (nfc_tag_present()) {
+            nfc_get_uid_hex((uint8_t*)tag_id, sizeof(tag_id));
+        }
+        backend_send_device_state(weight, stable, tag_id[0] ? tag_id : NULL);
+
         pthread_mutex_unlock(&backend_mutex);
 
         if (result == 0) {
@@ -248,8 +265,7 @@ int main(int argc, char **argv)
     ui_init();
 
     printf("UI initialized. Starting main loop...\n");
-    printf("Press ESC or close window to exit.\n");
-    printf("\n");
+    sim_print_help();
 
     /* Main loop */
     int running = 1;
@@ -259,8 +275,43 @@ int main(int argc, char **argv)
             if (event.type == SDL_QUIT) {
                 running = 0;
             } else if (event.type == SDL_KEYDOWN) {
-                if (event.key.keysym.sym == SDLK_ESCAPE) {
-                    running = 0;
+                switch (event.key.keysym.sym) {
+                    case SDLK_ESCAPE:
+                        running = 0;
+                        break;
+                    case SDLK_n:
+                        // Toggle NFC tag present
+                        sim_set_nfc_tag_present(!sim_get_nfc_tag_present());
+                        break;
+                    case SDLK_PLUS:
+                    case SDLK_EQUALS:
+                    case SDLK_KP_PLUS:
+                        // Increase scale weight by 50g
+                        sim_set_scale_weight(sim_get_scale_weight() + 50.0f);
+                        printf("[sim] Scale weight: %.1fg\n", sim_get_scale_weight());
+                        break;
+                    case SDLK_MINUS:
+                    case SDLK_KP_MINUS:
+                        // Decrease scale weight by 50g
+                        {
+                            float new_weight = sim_get_scale_weight() - 50.0f;
+                            if (new_weight < 0) new_weight = 0;
+                            sim_set_scale_weight(new_weight);
+                            printf("[sim] Scale weight: %.1fg\n", sim_get_scale_weight());
+                        }
+                        break;
+                    case SDLK_s:
+                        // Toggle scale initialized
+                        {
+                            extern bool scale_is_initialized(void);
+                            bool current = scale_is_initialized();
+                            sim_set_scale_initialized(!current);
+                            printf("[sim] Scale %s\n", !current ? "INITIALIZED" : "DISABLED");
+                        }
+                        break;
+                    case SDLK_h:
+                        sim_print_help();
+                        break;
                 }
             }
         }

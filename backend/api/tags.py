@@ -327,6 +327,86 @@ async def decode_tag(request: DecodeRequest):
     return response
 
 
+class TagLookupResponse(BaseModel):
+    """Response with tag/spool data lookup."""
+    found: bool = False
+    tag_uid: str = ""
+
+    # Decoded/looked up data
+    vendor: Optional[str] = None
+    material: Optional[str] = None
+    subtype: Optional[str] = None
+    color_name: Optional[str] = None
+    color_rgba: Optional[int] = None  # RGBA as integer (0xRRGGBBAA)
+    spool_weight: Optional[int] = None
+    tag_type: Optional[str] = None
+
+
+@router.get("/decode", response_model=TagLookupResponse)
+async def lookup_tag_by_uid(uid: str = Query(..., description="Tag UID in hex (e.g., 87:0D:51:00 or 870D5100)")):
+    """Look up spool data by NFC tag UID.
+
+    Searches the spool database for a spool with the given tag_id.
+    Used by the simulator to fetch decoded tag data.
+
+    Args:
+        uid: Tag UID in hex format (with or without colons)
+
+    Returns:
+        Tag/spool data if found, otherwise found=False
+    """
+    # Normalize UID (remove colons, uppercase)
+    tag_uid_hex = uid.replace(":", "").replace(" ", "").upper()
+
+    # Also create colon-separated format for searching
+    tag_uid_colon = ":".join([tag_uid_hex[i:i+2] for i in range(0, len(tag_uid_hex), 2)])
+
+    response = TagLookupResponse(tag_uid=tag_uid_hex)
+
+    # Search for spool with this tag_id
+    db = await get_db()
+    spools = await db.list_spools()
+
+    for spool in spools:
+        spool_tag = spool.tag_id if hasattr(spool, 'tag_id') else spool.get('tag_id', '')
+        if not spool_tag:
+            continue
+
+        # Normalize spool's tag_id for comparison
+        spool_tag_normalized = spool_tag.replace(":", "").replace(" ", "").upper()
+
+        if spool_tag_normalized == tag_uid_hex:
+            response.found = True
+
+            # Extract spool data
+            if hasattr(spool, 'model_dump'):
+                spool_dict = spool.model_dump()
+            else:
+                spool_dict = dict(spool)
+
+            response.vendor = spool_dict.get('brand', '')
+            response.material = spool_dict.get('material', '')
+            response.subtype = spool_dict.get('subtype', '')
+            response.color_name = spool_dict.get('color_name', '')
+            response.spool_weight = spool_dict.get('label_weight', 0)
+            response.tag_type = spool_dict.get('tag_type', 'database')
+
+            # Convert RGBA hex string to integer
+            rgba_str = spool_dict.get('rgba', '')
+            if rgba_str and len(rgba_str) >= 6:
+                try:
+                    # Ensure 8 chars (add FF alpha if missing)
+                    if len(rgba_str) == 6:
+                        rgba_str = rgba_str + "FF"
+                    response.color_rgba = int(rgba_str, 16)
+                except ValueError:
+                    response.color_rgba = 0
+
+            break
+
+    return response
+
+
 @router.post("/encode-from-spool/{spool_id}")
 async def encode_from_spool(
     spool_id: str,
