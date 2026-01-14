@@ -59,6 +59,11 @@ static lv_obj_t *last_main_screen = NULL;      // Track main screen to detect re
 // LED animation state (must reset when main screen is recreated)
 static bool led_anim_active = false;
 
+// Last action message (shown in status bar after completing an action)
+static char last_action_message[128] = {0};
+static uint32_t last_action_timestamp = 0;
+#define LAST_ACTION_DISPLAY_MS 30000  // Show last action for 30 seconds
+
 // Forward declarations
 static void update_main_screen_backend_status(BackendStatus *status);
 static void update_clock_displays(void);
@@ -70,6 +75,23 @@ static void update_notification_bell(void);
 static void update_status_bar(void);
 static void update_settings_menu_indicator(void);
 static void reset_main_screen_dynamic_state(void);  // Reset stale pointers on screen recreation
+
+/**
+ * @brief Set a message to display in the bottom status bar
+ *
+ * The message will be shown for LAST_ACTION_DISPLAY_MS milliseconds,
+ * then revert to the default status.
+ *
+ * @param message The message to display (will be copied)
+ */
+void ui_set_status_message(const char *message) {
+    if (message && message[0]) {
+        strncpy(last_action_message, message, sizeof(last_action_message) - 1);
+        last_action_message[sizeof(last_action_message) - 1] = '\0';
+        last_action_timestamp = lv_tick_get();
+        printf("[status_bar] Set last action: %s\n", last_action_message);
+    }
+}
 
 /**
  * @brief Update UI elements with backend printer status
@@ -2410,21 +2432,42 @@ static void update_status_bar(void) {
             }
         }
     } else {
-        // Show default status message
-        printf("[status_bar] Setting 'System running' (staging=%d, update=%d)\n", staging_active, update_available);
-        lv_label_set_text(objects.bottom_bar_message, "System running");
-        lv_obj_set_style_text_color(objects.bottom_bar_message, lv_color_hex(0x666666), 0);  // Muted gray
+        // Check if we have a last action message to show (persists until next action)
+        bool show_last_action = (last_action_message[0] != '\0');
 
-        // Show LED with muted color, no pulsing
-        if (objects.bottom_bar_message_dot) {
-            // Stop any existing animation
-            if (led_anim_active) {
-                lv_anim_delete(objects.bottom_bar_message_dot, led_pulse_anim_cb);
-                led_anim_active = false;
+        if (show_last_action) {
+            // Show last action message (cyan/blue for info)
+            lv_label_set_text(objects.bottom_bar_message, last_action_message);
+            lv_obj_set_style_text_color(objects.bottom_bar_message, lv_color_hex(0x00CCFF), 0);  // Cyan/blue
+
+            // Show LED with cyan color
+            if (objects.bottom_bar_message_dot) {
+                // Stop any existing animation
+                if (led_anim_active) {
+                    lv_anim_delete(objects.bottom_bar_message_dot, led_pulse_anim_cb);
+                    led_anim_active = false;
+                }
+                lv_obj_clear_flag(objects.bottom_bar_message_dot, LV_OBJ_FLAG_HIDDEN);
+                lv_led_set_color(objects.bottom_bar_message_dot, lv_color_hex(0x00CCFF));  // Cyan
+                lv_led_set_brightness(objects.bottom_bar_message_dot, 255);
             }
-            lv_obj_clear_flag(objects.bottom_bar_message_dot, LV_OBJ_FLAG_HIDDEN);
-            lv_led_set_color(objects.bottom_bar_message_dot, lv_color_hex(0x666666));  // Muted gray, static
-            lv_led_set_brightness(objects.bottom_bar_message_dot, 180);  // Dimmed
+        } else {
+            // Show default status message
+            printf("[status_bar] Setting 'System running' (staging=%d, update=%d)\n", staging_active, update_available);
+            lv_label_set_text(objects.bottom_bar_message, "System running");
+            lv_obj_set_style_text_color(objects.bottom_bar_message, lv_color_hex(0x666666), 0);  // Muted gray
+
+            // Show LED with muted color, no pulsing
+            if (objects.bottom_bar_message_dot) {
+                // Stop any existing animation
+                if (led_anim_active) {
+                    lv_anim_delete(objects.bottom_bar_message_dot, led_pulse_anim_cb);
+                    led_anim_active = false;
+                }
+                lv_obj_clear_flag(objects.bottom_bar_message_dot, LV_OBJ_FLAG_HIDDEN);
+                lv_led_set_color(objects.bottom_bar_message_dot, lv_color_hex(0x666666));  // Muted gray, static
+                lv_led_set_brightness(objects.bottom_bar_message_dot, 180);  // Dimmed
+            }
         }
     }
 }
@@ -2496,6 +2539,18 @@ void wire_printer_dropdown(void) {
 void wire_ams_printer_dropdown(void) {
     if (objects.ams_screen_top_bar_printer_select) {
         lv_obj_add_event_cb(objects.ams_screen_top_bar_printer_select, printer_dropdown_changed,
+                           LV_EVENT_VALUE_CHANGED, NULL);
+    }
+}
+
+/**
+ * @brief Wire up printer dropdown on scan_result screen
+ *
+ * Called from wire_scan_result_buttons() in ui.c
+ */
+void wire_scan_result_printer_dropdown(void) {
+    if (objects.scan_screen_top_bar_printer_select) {
+        lv_obj_add_event_cb(objects.scan_screen_top_bar_printer_select, printer_dropdown_changed,
                            LV_EVENT_VALUE_CHANGED, NULL);
     }
 }

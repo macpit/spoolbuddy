@@ -228,6 +228,37 @@ async def get_slicer_settings(version: str = "02.04.00.70"):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/settings/{setting_id}")
+async def get_setting_detail(setting_id: str):
+    """
+    Get detailed information for a specific setting/preset.
+
+    Returns preset details including base_id which is needed to map
+    custom PFUS presets to their parent Bambu preset.
+    """
+    token, _ = await _get_stored_credentials()
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    cloud = get_cloud_service()
+    cloud.set_token(token)
+
+    if not cloud.is_authenticated:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    try:
+        detail = await cloud.get_setting_detail(setting_id)
+        if detail:
+            return detail
+        raise HTTPException(status_code=404, detail=f"Setting {setting_id} not found")
+    except BambuCloudAuthError:
+        await _clear_credentials()
+        raise HTTPException(status_code=401, detail="Authentication expired")
+    except BambuCloudError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/filaments", response_model=list[SlicerPreset])
 async def get_filament_presets():
     """

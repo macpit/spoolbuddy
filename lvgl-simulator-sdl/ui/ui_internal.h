@@ -227,6 +227,7 @@ void update_scale_ui(void);
 void update_backend_ui(void);
 void wire_printer_dropdown(void);
 void wire_ams_printer_dropdown(void);
+void wire_scan_result_printer_dropdown(void);
 void init_main_screen_ams(void);      // Hide static AMS content immediately on screen load
 int get_selected_printer_index(void);
 bool is_selected_printer_dual_nozzle(void);
@@ -248,6 +249,7 @@ void ui_scan_result_init(void);
 void ui_scan_result_update(void);
 int ui_scan_result_get_selected_ams(void);
 int ui_scan_result_get_selected_slot(void);
+void ui_scan_result_wire_assign_button(void);
 
 // =============================================================================
 // Module Functions - ui_core.c (wiring)

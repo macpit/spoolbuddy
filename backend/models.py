@@ -130,6 +130,8 @@ class PrinterWithStatus(BaseModel):
     tray_now_left: Optional[int] = None  # Active tray left nozzle (dual)
     tray_now_right: Optional[int] = None  # Active tray right nozzle (dual)
     active_extruder: Optional[int] = None  # Currently active extruder (0=right, 1=left)
+    # Tray reading state (RFID scanning)
+    tray_reading_bits: Optional[int] = None  # Bitmask of trays currently being read
 
 
 class PrinterState(BaseModel):
@@ -151,6 +153,8 @@ class PrinterState(BaseModel):
     # Detailed status tracking (from stg_cur field)
     stg_cur: int = -1  # Current stage number (-1 = idle/unknown, 255 = idle on A1/P1)
     stg_cur_name: Optional[str] = None  # Human-readable stage name
+    # Tray reading state (for tracking RFID scanning)
+    tray_reading_bits: Optional[int] = None  # Bitmask of trays currently being read
 
 
 # ============ AMS Filament Setting ============
@@ -167,8 +171,7 @@ class AmsFilamentSettingRequest(BaseModel):
 class AssignSpoolRequest(BaseModel):
     """Request to assign a spool to an AMS slot."""
     spool_id: str
-    ams_id: int  # 0-3 for AMS, 128-135 for AMS-HT, 254/255 for external
-    tray_id: int  # 0-3 for AMS trays, 0 for HT/external
+    # Note: ams_id and tray_id come from path parameters, not body
 
 
 class SetCalibrationRequest(BaseModel):

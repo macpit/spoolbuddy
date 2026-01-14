@@ -463,6 +463,66 @@ def on_printer_disconnect(serial: str):
         pass  # No running loop
 
 
+# Store recent assignment completions for polling (used by simulator)
+# Format: [(timestamp, serial, ams_id, tray_id, spool_id, success), ...]
+_assignment_completions: list[tuple] = []
+_assignment_completions_max = 10  # Keep last 10 completions
+
+
+def on_assignment_complete(serial: str, ams_id: int, tray_id: int, spool_id: str, success: bool):
+    """Handle assignment completion (spool inserted and configured)."""
+    logger.info(f"Assignment complete: {serial} AMS {ams_id} tray {tray_id} spool={spool_id} success={success}")
+
+    # Store for polling
+    import time
+    _assignment_completions.append((time.time(), serial, ams_id, tray_id, spool_id, success))
+    # Trim old entries
+    while len(_assignment_completions) > _assignment_completions_max:
+        _assignment_completions.pop(0)
+
+    # Broadcast to clients
+    message = {
+        "type": "assignment_complete",
+        "serial": serial,
+        "ams_id": ams_id,
+        "tray_id": tray_id,
+        "spool_id": spool_id,
+        "success": success,
+    }
+
+    # Schedule broadcast in event loop
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(broadcast_message(message))
+    except RuntimeError:
+        pass  # No running loop
+
+
+def get_assignment_completions():
+    """Get recent assignment completions (for polling)."""
+    return _assignment_completions
+
+
+def on_tray_reading_change(serial: str, old_bits: int | None, new_bits: int):
+    """Handle tray reading state change (RFID scanning started/stopped)."""
+    logger.info(f"Tray reading changed: {serial} {old_bits} -> {new_bits}")
+
+    # Broadcast to clients
+    message = {
+        "type": "tray_reading",
+        "serial": serial,
+        "old_bits": old_bits,
+        "new_bits": new_bits,
+    }
+
+    # Schedule broadcast in event loop
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(broadcast_message(message))
+    except RuntimeError:
+        pass  # No running loop
+
+
 async def auto_connect_printers():
     """Connect to printers with auto_connect enabled."""
     await asyncio.sleep(0.5)  # Wait for startup
@@ -505,6 +565,8 @@ async def lifespan(app: FastAPI):
     printer_manager.set_state_callback(on_printer_state_update)
     printer_manager.set_connect_callback(on_printer_connect)
     printer_manager.set_disconnect_callback(on_printer_disconnect)
+    printer_manager.set_assignment_complete_callback(on_assignment_complete)
+    printer_manager.set_tray_reading_callback(on_tray_reading_change)
 
     # Register mDNS service for device discovery
     # Service type must be <= 15 chars, using "_spbuddy-srv" (12 chars)

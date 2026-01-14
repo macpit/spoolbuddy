@@ -18,8 +18,9 @@ static bool last_tag_present = false;
 static char uid_str[48] = {0};
 
 /**
- * Poll NFC status and update scan_result screen
- * Call this from the main UI tick
+ * Poll NFC status - NO LONGER updates scan_result screen labels
+ * The scan_result screen uses STATIC captured data from ui_scan_result_init()
+ * This function only tracks state for ui_nfc_tag_present() and ui_nfc_get_uid_str()
  */
 void ui_nfc_update(void) {
     if (!nfc_is_initialized()) {
@@ -28,39 +29,21 @@ void ui_nfc_update(void) {
 
     bool tag_present = nfc_tag_present();
 
-    // Only update on state change
+    // Only update internal state on state change
     if (tag_present != last_tag_present) {
         last_tag_present = tag_present;
 
         if (tag_present) {
-            // Get UID as hex string
+            // Get UID as hex string for internal tracking only
             uint8_t hex_buf[32];
             uint8_t len = nfc_get_uid_hex(hex_buf, sizeof(hex_buf) - 1);
             hex_buf[len] = '\0';
             snprintf(uid_str, sizeof(uid_str), "Tag: %s", (char*)hex_buf);
-
-            // Update scan screen labels if they exist
-            if (objects.scan_screen_main_panel_top_panel_label_message) {
-                lv_label_set_text(objects.scan_screen_main_panel_top_panel_label_message, "NFC Tag Detected!");
-            }
-            if (objects.scan_screen_main_panel_top_panel_label_status) {
-                lv_label_set_text(objects.scan_screen_main_panel_top_panel_label_status, uid_str);
-            }
-            if (objects.scan_screen_main_panel_top_panel_icon_ok) {
-                lv_obj_clear_flag(objects.scan_screen_main_panel_top_panel_icon_ok, LV_OBJ_FLAG_HIDDEN);
-            }
         } else {
-            // Tag removed
-            if (objects.scan_screen_main_panel_top_panel_label_message) {
-                lv_label_set_text(objects.scan_screen_main_panel_top_panel_label_message, "Place spool on scale\nto scan & weigh...");
-            }
-            if (objects.scan_screen_main_panel_top_panel_label_status) {
-                lv_label_set_text(objects.scan_screen_main_panel_top_panel_label_status, "Waiting for tag...");
-            }
-            if (objects.scan_screen_main_panel_top_panel_icon_ok) {
-                lv_obj_add_flag(objects.scan_screen_main_panel_top_panel_icon_ok, LV_OBJ_FLAG_HIDDEN);
-            }
+            uid_str[0] = '\0';
         }
+        // NOTE: Do NOT update scan_result screen labels here!
+        // The scan_result screen captures tag data statically in ui_scan_result_init()
     }
 }
 

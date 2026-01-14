@@ -100,6 +100,21 @@ DISCONNECT_GRACE_PERIOD_SEC = 5.0
 
 
 @dataclass
+class PendingAssignment:
+    """Pending spool assignment waiting for tray insertion."""
+    spool_id: str
+    tray_info_idx: str
+    setting_id: str
+    tray_type: str
+    tray_color: str
+    nozzle_temp_min: int
+    nozzle_temp_max: int
+    cali_idx: int = -1  # K-profile calibration index
+    nozzle_diameter: str = "0.4"  # For extrusion_cali_sel
+    created_at: float = field(default_factory=time.time)
+
+
+@dataclass
 class PrinterConnection:
     """Manages MQTT connection to a single Bambu printer."""
 
@@ -121,6 +136,10 @@ class PrinterConnection:
     _kprofile_lock: Optional[asyncio.Lock] = field(default=None, repr=False)  # Lock to prevent concurrent requests
     _kprofile_cache: dict = field(default_factory=dict, repr=False)  # nozzle_diameter -> (profiles, timestamp)
     _kprofile_cache_ttl: float = field(default=30.0, repr=False)  # Cache TTL in seconds
+    _pending_assignments: dict = field(default_factory=dict, repr=False)  # (ams_id, tray_id) -> PendingAssignment
+    _on_assignment_complete: Optional[Callable[[str, int, int, str, bool], None]] = field(default=None, repr=False)  # (serial, ams_id, tray_id, spool_id, success)
+    _on_tray_reading_change: Optional[Callable[[str, Optional[int], int], None]] = field(default=None, repr=False)  # (serial, old_bits, new_bits)
+    _nozzle_diameters: dict = field(default_factory=dict, repr=False)  # extruder_id -> nozzle_diameter string
 
     @property
     def connected(self) -> bool:
@@ -137,6 +156,10 @@ class PrinterConnection:
     @property
     def state(self) -> PrinterState:
         return self._state
+
+    def get_nozzle_diameter(self, extruder_id: int = 0) -> str:
+        """Get nozzle diameter for an extruder. Returns '0.4' as fallback."""
+        return self._nozzle_diameters.get(extruder_id, "0.4")
 
     def connect(self, on_state_update: Callable[[str, PrinterState], None], on_disconnect: Optional[Callable[[str], None]] = None, on_connect: Optional[Callable[[str], None]] = None):
         """Connect to printer via MQTT."""
@@ -282,12 +305,14 @@ class PrinterConnection:
         }
 
         topic = f"device/{self.serial}/request"
+        payload_json = json.dumps(command)
+        logger.info(f"[{self.serial}] MQTT extrusion_cali_sel: {payload_json}")
         try:
-            result = self._client.publish(topic, json.dumps(command))
+            result = self._client.publish(topic, payload_json)
             if result.rc == mqtt.MQTT_ERR_SUCCESS:
                 logger.info(
                     f"Set calibration on {self.serial}: AMS {ams_id}, tray {tray_id}, "
-                    f"cali_idx={cali_idx}"
+                    f"original_tray_id={original_tray_id}, cali_idx={cali_idx}"
                 )
                 return True
             else:
@@ -393,6 +418,7 @@ class PrinterConnection:
         ams_id: int,
         tray_id: int,
         tray_info_idx: str = "",
+        setting_id: str = "",
         tray_type: str = "",
         tray_color: str = "FFFFFFFF",
         nozzle_temp_min: int = 190,
@@ -403,7 +429,8 @@ class PrinterConnection:
         Args:
             ams_id: AMS unit ID (0-3 for regular AMS, 128-135 for AMS-HT, 254/255 for external)
             tray_id: Tray ID within AMS (0-3 for regular AMS, 0 for HT/external)
-            tray_info_idx: Filament preset ID (e.g., "GFL99")
+            tray_info_idx: Filament ID (e.g., "GFL05") - short format
+            setting_id: Setting ID (e.g., "GFSL05_07") - full format with version
             tray_type: Material type (e.g., "PLA", "PETG")
             tray_color: RGBA hex color (e.g., "FF0000FF" for red)
             nozzle_temp_min: Minimum nozzle temperature
@@ -438,14 +465,19 @@ class PrinterConnection:
                 "sequence_id": "1",
             }
         }
+        # Only include setting_id if provided (it's optional)
+        if setting_id:
+            command["print"]["setting_id"] = setting_id
 
         topic = f"device/{self.serial}/request"
+        payload_json = json.dumps(command)
+        logger.info(f"[{self.serial}] MQTT ams_filament_setting: {payload_json}")
         try:
-            result = self._client.publish(topic, json.dumps(command))
+            result = self._client.publish(topic, payload_json)
             if result.rc == mqtt.MQTT_ERR_SUCCESS:
                 logger.info(
                     f"Set filament on {self.serial}: AMS {ams_id}, tray {tray_id}, "
-                    f"type={tray_type}, color={tray_color}"
+                    f"type={tray_type}, color={tray_color}, tray_info_idx={tray_info_idx}"
                 )
                 return True
             else:
@@ -454,6 +486,124 @@ class PrinterConnection:
         except Exception as e:
             logger.error(f"Error setting filament on {self.serial}: {e}")
             return False
+
+    def stage_assignment(
+        self,
+        ams_id: int,
+        tray_id: int,
+        spool_id: str,
+        tray_info_idx: str = "",
+        setting_id: str = "",
+        tray_type: str = "",
+        tray_color: str = "FFFFFFFF",
+        nozzle_temp_min: int = 190,
+        nozzle_temp_max: int = 230,
+        cali_idx: int = -1,
+        nozzle_diameter: str = "0.4",
+    ) -> bool:
+        """Stage a pending assignment for an AMS slot.
+
+        The assignment will be executed when a spool is inserted into the slot.
+
+        Args:
+            ams_id: AMS unit ID
+            tray_id: Tray ID within AMS
+            spool_id: Spool ID from database
+            tray_info_idx: Filament ID (short format)
+            setting_id: Setting ID (full format)
+            tray_type: Material type
+            tray_color: RGBA hex color
+            nozzle_temp_min: Minimum nozzle temperature
+            nozzle_temp_max: Maximum nozzle temperature
+            cali_idx: K-profile calibration index (-1 for no profile)
+            nozzle_diameter: Nozzle diameter for calibration
+
+        Returns:
+            True if staged successfully
+        """
+        key = (ams_id, tray_id)
+        self._pending_assignments[key] = PendingAssignment(
+            spool_id=spool_id,
+            tray_info_idx=tray_info_idx,
+            setting_id=setting_id,
+            tray_type=tray_type,
+            tray_color=tray_color,
+            nozzle_temp_min=nozzle_temp_min,
+            nozzle_temp_max=nozzle_temp_max,
+            cali_idx=cali_idx,
+            nozzle_diameter=nozzle_diameter,
+        )
+        logger.info(f"[{self.serial}] Staged assignment for AMS {ams_id} tray {tray_id}: spool={spool_id}, type={tray_type}, cali_idx={cali_idx}")
+        return True
+
+    def cancel_assignment(self, ams_id: int, tray_id: int) -> bool:
+        """Cancel a pending assignment for an AMS slot.
+
+        Returns:
+            True if an assignment was cancelled, False if none existed
+        """
+        key = (ams_id, tray_id)
+        if key in self._pending_assignments:
+            del self._pending_assignments[key]
+            logger.info(f"[{self.serial}] Cancelled pending assignment for AMS {ams_id} tray {tray_id}")
+            return True
+        return False
+
+    def get_pending_assignment(self, ams_id: int, tray_id: int) -> Optional[PendingAssignment]:
+        """Get pending assignment for an AMS slot."""
+        return self._pending_assignments.get((ams_id, tray_id))
+
+    def get_all_pending_assignments(self) -> dict:
+        """Get all pending assignments."""
+        return dict(self._pending_assignments)
+
+    def _execute_pending_assignment(self, ams_id: int, tray_id: int):
+        """Execute a pending assignment for an AMS slot.
+
+        Called when a spool is detected in a slot that has a pending assignment.
+        """
+        key = (ams_id, tray_id)
+        assignment = self._pending_assignments.get(key)
+        if not assignment:
+            logger.warning(f"[{self.serial}] _execute_pending_assignment called but no assignment for AMS {ams_id} tray {tray_id}")
+            return
+
+        logger.info(f"[{self.serial}] >>> EXECUTING pending assignment for AMS {ams_id} tray {tray_id}: spool={assignment.spool_id}")
+
+        # Send the filament setting command
+        success = self.set_filament(
+            ams_id=ams_id,
+            tray_id=tray_id,
+            tray_info_idx=assignment.tray_info_idx,
+            setting_id=assignment.setting_id,
+            tray_type=assignment.tray_type,
+            tray_color=assignment.tray_color,
+            nozzle_temp_min=assignment.nozzle_temp_min,
+            nozzle_temp_max=assignment.nozzle_temp_max,
+        )
+
+        # Also send extrusion_cali_sel to set K-profile (like SpoolEase does)
+        self.set_calibration(
+            ams_id=ams_id,
+            tray_id=tray_id,
+            cali_idx=assignment.cali_idx,
+            filament_id=assignment.tray_info_idx,
+            nozzle_diameter=assignment.nozzle_diameter,
+        )
+
+        # Remove from pending regardless of success (user can retry)
+        del self._pending_assignments[key]
+        logger.info(f"[{self.serial}] Removed pending assignment, set_filament success={success}")
+
+        # Notify callback
+        if self._on_assignment_complete and self._loop:
+            spool_id = assignment.spool_id
+            logger.info(f"[{self.serial}] Calling assignment complete callback: spool={spool_id}, success={success}")
+            self._loop.call_soon_threadsafe(
+                lambda: self._on_assignment_complete(self.serial, ams_id, tray_id, spool_id, success)
+            )
+        else:
+            logger.warning(f"[{self.serial}] Cannot notify: callback={self._on_assignment_complete is not None}, loop={self._loop is not None}")
 
     def _on_connect(self, client, userdata, flags, reason_code, properties):
         """MQTT connect callback."""
@@ -501,11 +651,12 @@ class PrinterConnection:
         """MQTT message callback."""
         try:
             payload = json.loads(msg.payload.decode())
-            # Debug: log messages that might contain calibration data
+            # Debug: log messages that might contain calibration data or command responses
             if "print" in payload:
                 print_data = payload["print"]
-                if "filaments" in print_data or print_data.get("command") in ["extrusion_cali_get", "extrusion_cali_sel"]:
-                    logger.info(f"[{self.serial}] CALIBRATION MSG: {json.dumps(print_data)[:500]}")
+                cmd = print_data.get("command", "")
+                if "filaments" in print_data or cmd in ["extrusion_cali_get", "extrusion_cali_sel", "ams_filament_setting"]:
+                    logger.info(f"[{self.serial}] CMD RESPONSE [{cmd}]: {json.dumps(print_data)[:500]}")
             self._handle_message(payload)
         except json.JSONDecodeError as e:
             logger.debug(f"Failed to parse message: {e}")
@@ -561,6 +712,10 @@ class PrinterConnection:
         if command == "extrusion_cali_get":
             self._handle_calibration_response(print_data)
             return
+
+        # Extract nozzle diameter (single-nozzle printers)
+        if "nozzle_diameter" in print_data:
+            self._nozzle_diameters[0] = str(print_data["nozzle_diameter"])
 
         # Extract gcode state
         if "gcode_state" in print_data:
@@ -629,6 +784,12 @@ class PrinterConnection:
             # We decode it to a global tray index: ams_id * 4 + slot_id
             for ext_info in extruder_info:
                 ext_id = ext_info.get("id")  # 0=right, 1=left
+
+                # Parse nozzle diameter (dia field)
+                nozzle_dia = ext_info.get("dia")
+                if nozzle_dia is not None and ext_id is not None:
+                    self._nozzle_diameters[ext_id] = str(nozzle_dia)
+
                 snow = ext_info.get("snow")  # encoded tray_now for this extruder
                 if snow is not None:
                     snow_int = self._safe_int(snow)
@@ -729,6 +890,21 @@ class PrinterConnection:
         if not hasattr(self, "_ams_extruder_map"):
             self._ams_extruder_map = {}
 
+        # Track previous tray states for detecting spool insertion
+        if not hasattr(self, "_prev_tray_states"):
+            self._prev_tray_states = {}  # (ams_id, tray_id) -> tray_type
+
+        # Parse tray_reading_bits (bitmask of trays currently being read)
+        tray_reading_bits_raw = ams_data.get("tray_reading_bits")
+        if tray_reading_bits_raw is not None:
+            try:
+                new_tray_reading = int(tray_reading_bits_raw, 16) if isinstance(tray_reading_bits_raw, str) else int(tray_reading_bits_raw)
+                if new_tray_reading != self._state.tray_reading_bits:
+                    logger.info(f"[{self.serial}] tray_reading_bits changed: {self._state.tray_reading_bits} -> {new_tray_reading}")
+                    self._state.tray_reading_bits = new_tray_reading
+            except (ValueError, TypeError):
+                pass
+
         # Track if we have info field in this update (helps debug)
         has_info_field = any(unit.get("info") is not None for unit in ams_data["ams"])
 
@@ -749,6 +925,9 @@ class PrinterConnection:
                     self._ams_extruder_map[unit_id] = extruder_id
                 except (ValueError, TypeError):
                     pass
+
+        # Collect trays to check for pending assignments
+        trays_to_check = []
 
         units = []
         for ams_unit in ams_data["ams"]:
@@ -772,9 +951,30 @@ class PrinterConnection:
             # Parse trays
             trays = []
             for tray_data in ams_unit.get("tray", []):
-                tray = self._parse_tray(tray_data, unit_id, self._safe_int(tray_data.get("id"), 0))
+                tray_id = self._safe_int(tray_data.get("id"), 0)
+                tray = self._parse_tray(tray_data, unit_id, tray_id)
                 if tray:
                     trays.append(tray)
+
+                    # Check for spool insertion (tray_type was empty, now has value)
+                    key = (unit_id, tray_id)
+                    prev_tray_type = self._prev_tray_states.get(key)
+                    curr_tray_type = tray.tray_type
+
+                    # Update state tracking
+                    self._prev_tray_states[key] = curr_tray_type
+
+                    # Detect insertion: was empty (None or ""), now has type
+                    was_empty = not prev_tray_type
+                    is_occupied = bool(curr_tray_type)
+
+                    # Log state changes for trays with pending assignments
+                    if key in self._pending_assignments:
+                        logger.info(f"[{self.serial}] AMS {unit_id} tray {tray_id}: prev='{prev_tray_type}' curr='{curr_tray_type}' was_empty={was_empty} is_occupied={is_occupied}")
+
+                    if was_empty and is_occupied and key in self._pending_assignments:
+                        logger.info(f"[{self.serial}] Spool inserted into AMS {unit_id} tray {tray_id} - executing pending assignment")
+                        trays_to_check.append((unit_id, tray_id))
 
             units.append(AmsUnit(
                 id=unit_id,
@@ -785,6 +985,10 @@ class PrinterConnection:
             ))
 
         self._state.ams_units = units
+
+        # Execute any pending assignments (after state is updated)
+        for ams_id, tray_id in trays_to_check:
+            self._execute_pending_assignment(ams_id, tray_id)
 
     def _parse_tray(self, tray_data: dict, ams_id: int, tray_id: int) -> Optional[AmsTray]:
         """Parse single tray data."""
@@ -857,6 +1061,8 @@ class PrinterManager:
         self._on_state_update: Optional[Callable[[str, PrinterState], None]] = None
         self._on_disconnect: Optional[Callable[[str], None]] = None
         self._on_connect: Optional[Callable[[str], None]] = None
+        self._on_assignment_complete: Optional[Callable[[str, int, int, str, bool], None]] = None
+        self._on_tray_reading_change: Optional[Callable[[str, Optional[int], int], None]] = None
 
     def set_state_callback(self, callback: Callable[[str, PrinterState], None]):
         """Set callback for printer state updates."""
@@ -870,6 +1076,27 @@ class PrinterManager:
         """Set callback for printer connection."""
         self._on_connect = callback
 
+    def set_assignment_complete_callback(self, callback: Callable[[str, int, int, str, bool], None]):
+        """Set callback for when a staged assignment completes.
+
+        Callback receives: (serial, ams_id, tray_id, spool_id, success)
+        """
+        self._on_assignment_complete = callback
+        # Also set on existing connections
+        for conn in self._connections.values():
+            conn._on_assignment_complete = callback
+
+    def set_tray_reading_callback(self, callback: Callable[[str, Optional[int], int], None]):
+        """Set callback for when tray reading state changes.
+
+        Callback receives: (serial, old_bits, new_bits)
+        The bits indicate which trays are currently being read (RFID scanning).
+        """
+        self._on_tray_reading_change = callback
+        # Also set on existing connections
+        for conn in self._connections.values():
+            conn._on_tray_reading_change = callback
+
     async def connect(self, serial: str, ip_address: str, access_code: str, name: Optional[str] = None):
         """Connect to a printer."""
         if serial in self._connections:
@@ -882,6 +1109,14 @@ class PrinterManager:
             access_code=access_code,
             name=name,
         )
+
+        # Set assignment callback if configured
+        if self._on_assignment_complete:
+            conn._on_assignment_complete = self._on_assignment_complete
+
+        # Set tray reading callback if configured
+        if self._on_tray_reading_change:
+            conn._on_tray_reading_change = self._on_tray_reading_change
 
         try:
             conn.connect(self._handle_state_update, self._handle_disconnect, self._handle_connect)
@@ -961,6 +1196,7 @@ class PrinterManager:
         ams_id: int,
         tray_id: int,
         tray_info_idx: str = "",
+        setting_id: str = "",
         tray_type: str = "",
         tray_color: str = "FFFFFFFF",
         nozzle_temp_min: int = 190,
@@ -976,6 +1212,7 @@ class PrinterManager:
             ams_id=ams_id,
             tray_id=tray_id,
             tray_info_idx=tray_info_idx,
+            setting_id=setting_id,
             tray_type=tray_type,
             tray_color=tray_color,
             nozzle_temp_min=nozzle_temp_min,
@@ -1030,6 +1267,75 @@ class PrinterManager:
             return []
 
         return await conn.get_kprofiles(nozzle_diameter)
+
+    def get_nozzle_diameter(self, serial: str, extruder_id: int = 0) -> str:
+        """Get nozzle diameter for a printer's extruder."""
+        conn = self._connections.get(serial)
+        if not conn:
+            return "0.4"  # Fallback
+        return conn.get_nozzle_diameter(extruder_id)
+
+    def stage_assignment(
+        self,
+        serial: str,
+        ams_id: int,
+        tray_id: int,
+        spool_id: str,
+        tray_info_idx: str = "",
+        setting_id: str = "",
+        tray_type: str = "",
+        tray_color: str = "FFFFFFFF",
+        nozzle_temp_min: int = 190,
+        nozzle_temp_max: int = 230,
+        cali_idx: int = -1,
+        nozzle_diameter: str = "0.4",
+    ) -> bool:
+        """Stage a pending assignment for an AMS slot.
+
+        The assignment will be executed when a spool is inserted into the slot.
+        """
+        conn = self._connections.get(serial)
+        if not conn:
+            logger.error(f"Printer {serial} not connected")
+            return False
+
+        return conn.stage_assignment(
+            ams_id=ams_id,
+            tray_id=tray_id,
+            spool_id=spool_id,
+            tray_info_idx=tray_info_idx,
+            setting_id=setting_id,
+            tray_type=tray_type,
+            tray_color=tray_color,
+            nozzle_temp_min=nozzle_temp_min,
+            nozzle_temp_max=nozzle_temp_max,
+            cali_idx=cali_idx,
+            nozzle_diameter=nozzle_diameter,
+        )
+
+    def cancel_assignment(self, serial: str, ams_id: int, tray_id: int) -> bool:
+        """Cancel a pending assignment for an AMS slot."""
+        conn = self._connections.get(serial)
+        if not conn:
+            return False
+
+        return conn.cancel_assignment(ams_id, tray_id)
+
+    def get_pending_assignment(self, serial: str, ams_id: int, tray_id: int) -> Optional[PendingAssignment]:
+        """Get pending assignment for an AMS slot."""
+        conn = self._connections.get(serial)
+        if not conn:
+            return None
+
+        return conn.get_pending_assignment(ams_id, tray_id)
+
+    def get_all_pending_assignments(self, serial: str) -> dict:
+        """Get all pending assignments for a printer."""
+        conn = self._connections.get(serial)
+        if not conn:
+            return {}
+
+        return conn.get_all_pending_assignments()
 
     def _handle_state_update(self, serial: str, state: PrinterState):
         """Handle state update from printer."""

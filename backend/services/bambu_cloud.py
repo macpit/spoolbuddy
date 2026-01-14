@@ -169,6 +169,33 @@ class BambuCloudService:
         except httpx.RequestError as e:
             raise BambuCloudError(f"Request failed: {e}")
 
+    async def get_setting_detail(self, setting_id: str) -> Optional[dict]:
+        """
+        Get detailed information for a specific setting/preset.
+
+        Returns preset details including base_id which is needed to map
+        custom PFUS presets to their parent Bambu preset.
+        """
+        if not self.is_authenticated:
+            logger.warning("Cannot fetch setting detail: not authenticated")
+            return None
+
+        try:
+            response = await self._client.get(
+                f"{self.base_url}/v1/iot-service/api/slicer/setting/{setting_id}",
+                headers=self._get_headers()
+            )
+
+            if response.status_code == 200:
+                return response.json()
+
+            logger.warning(f"Failed to get setting {setting_id}: {response.status_code}")
+            return None
+
+        except httpx.RequestError as e:
+            logger.error(f"Request failed for setting {setting_id}: {e}")
+            return None
+
     async def close(self):
         """Close the HTTP client."""
         await self._client.aclose()

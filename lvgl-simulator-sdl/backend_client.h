@@ -63,6 +63,9 @@ typedef struct {
     int tray_now_right;       // Dual nozzle right
     int active_extruder;      // Currently printing extruder
 
+    // Tray reading state (RFID scanning)
+    int tray_reading_bits;    // Bitmask of trays being read (-1 = unknown)
+
     bool connected;
 } BackendPrinterState;
 
@@ -175,6 +178,7 @@ int backend_get_tray_now(int printer_index);
 int backend_get_tray_now_left(int printer_index);
 int backend_get_tray_now_right(int printer_index);
 int backend_get_active_extruder(int printer_index);
+int backend_get_tray_reading_bits(int printer_index);  // Bitmask of trays being read (-1 if unknown)
 int backend_has_cover(void);
 const uint8_t* backend_get_cover_data(uint32_t *size_out);
 
@@ -192,8 +196,47 @@ void sync_printers_from_backend(void);
 // Spool Inventory functions (calls backend API)
 // =============================================================================
 
+// Spool info from inventory
+typedef struct {
+    char id[64];            // Spool UUID (needed for K-profile lookup)
+    char tag_id[64];
+    char brand[32];
+    char material[32];
+    char subtype[32];
+    char color_name[32];
+    uint32_t color_rgba;
+    int label_weight;
+    int weight_current;
+    char slicer_filament[32];
+    char tag_type[32];
+    bool valid;
+} SpoolInfo;
+
+// K-profile (pressure advance calibration) stored with a spool
+typedef struct {
+    char printer_serial[32];
+    int extruder;           // -1 for single-nozzle, 0=right, 1=left
+    char k_value[16];       // K-factor value as string (e.g., "0.040")
+    char name[64];          // Profile name (e.g., "Bambu PLA Basic")
+    int cali_idx;           // Calibration index on printer
+} SpoolKProfile;
+
 // Check if a spool with given tag_id exists in inventory
 bool spool_exists_by_tag(const char *tag_id);
+
+// Get spool details from inventory by tag_id
+// Returns true if found, false otherwise
+// Fills in the SpoolInfo struct with data
+bool spool_get_by_tag(const char *tag_id, SpoolInfo *info);
+
+// Get K-profiles for a spool
+// Returns number of profiles found (0 if none), fills profiles array up to max_profiles
+// The spool_id is the UUID from SpoolInfo.id
+int spool_get_k_profiles(const char *spool_id, SpoolKProfile *profiles, int max_profiles);
+
+// Get K-profile for a spool matching a specific printer
+// Returns true if found, fills profile
+bool spool_get_k_profile_for_printer(const char *spool_id, const char *printer_serial, SpoolKProfile *profile);
 
 // Add a new spool to inventory
 // Parameters:
@@ -243,6 +286,63 @@ uint32_t nfc_get_tag_color_rgba(void);
 int nfc_get_tag_spool_weight(void);
 const char *nfc_get_tag_type(void);
 const char *nfc_get_tag_slicer_filament(void);
+
+// =============================================================================
+// AMS Slot Assignment functions (configure printer AMS with filament/calibration)
+// =============================================================================
+
+// Assignment result status
+typedef enum {
+    ASSIGN_RESULT_ERROR = 0,      // Failed to assign
+    ASSIGN_RESULT_CONFIGURED = 1, // Slot configured immediately (spool was present)
+    ASSIGN_RESULT_STAGED = 2,     // Assignment staged - waiting for spool insertion
+    ASSIGN_RESULT_STAGED_REPLACE = 3,  // Assignment staged - wrong spool in slot, needs replacement
+} AssignResult;
+
+// Assign a spool to an AMS tray (sends filament settings to printer)
+// Parameters:
+//   printer_serial: Printer serial number
+//   ams_id: AMS unit ID (0-3 for regular AMS, 128-135 for AMS-HT, 254/255 for external)
+//   tray_id: Tray ID within AMS (0-3 for regular AMS, 0 for HT/external)
+//   spool_id: Spool UUID from inventory
+// Returns:
+//   ASSIGN_RESULT_CONFIGURED - slot was configured immediately
+//   ASSIGN_RESULT_STAGED - assignment staged, waiting for spool insertion
+//   ASSIGN_RESULT_ERROR - failed
+AssignResult backend_assign_spool_to_tray(const char *printer_serial, int ams_id, int tray_id,
+                                           const char *spool_id);
+
+// Cancel a staged assignment (before spool is inserted)
+// Returns true if a staged assignment was cancelled
+bool backend_cancel_staged_assignment(const char *printer_serial, int ams_id, int tray_id);
+
+// Assignment completion event (from polling)
+typedef struct {
+    double timestamp;
+    char serial[32];
+    int ams_id;
+    int tray_id;
+    char spool_id[64];
+    bool success;
+} AssignmentCompletion;
+
+// Poll for assignment completion events
+// Returns number of events found (up to max_events), fills events array
+// Pass last_timestamp to only get events newer than that
+int backend_poll_assignment_completions(double since_timestamp, AssignmentCompletion *events, int max_events);
+
+// Set calibration (K-profile) for an AMS tray
+// Parameters:
+//   printer_serial: Printer serial number
+//   ams_id: AMS unit ID
+//   tray_id: Tray ID within AMS
+//   cali_idx: Calibration index from SpoolKProfile (-1 for default)
+//   filament_id: Filament preset ID (e.g., "GFL99")
+//   nozzle_diameter: Nozzle size (e.g., "0.4")
+// Returns true on success
+bool backend_set_tray_calibration(const char *printer_serial, int ams_id, int tray_id,
+                                   int cali_idx, const char *filament_id,
+                                   const char *nozzle_diameter);
 
 #ifdef __cplusplus
 }

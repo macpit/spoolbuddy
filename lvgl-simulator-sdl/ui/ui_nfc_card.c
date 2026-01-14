@@ -31,6 +31,24 @@ extern const char* nfc_get_tag_slicer_filament(void);
 
 // Spool inventory functions (backend API)
 extern bool spool_exists_by_tag(const char *tag_id);
+
+// SpoolInfo struct (from backend_client.h)
+typedef struct {
+    char id[64];            // Spool UUID
+    char tag_id[64];
+    char brand[32];
+    char material[32];
+    char subtype[32];
+    char color_name[32];
+    uint32_t color_rgba;
+    int label_weight;
+    int weight_current;
+    char slicer_filament[32];
+    char tag_type[32];
+    bool valid;
+} SpoolInfo;
+
+extern bool spool_get_by_tag(const char *tag_id, SpoolInfo *info);
 extern bool spool_add_to_inventory(const char *tag_id, const char *vendor, const char *material,
                                     const char *subtype, const char *color_name, uint32_t color_rgba,
                                     int label_weight, int weight_current, const char *data_origin,
@@ -47,6 +65,7 @@ extern enum ScreensEnum pendingScreen;
 // Static state
 static bool last_tag_present = false;
 static bool popup_dismissed_for_current_tag = false;  // Prevents reopening after Add
+static char last_tag_uid[32] = "";  // Track current tag UID to detect tag changes
 
 // Forward declarations
 static void close_popup(void);
@@ -212,14 +231,31 @@ static void create_tag_popup(void) {
     lv_obj_set_style_text_color(title, lv_color_hex(0x4CAF50), LV_PART_MAIN);
     lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 0);
 
-    // Get decoded tag info
-    const char *vendor = nfc_get_tag_vendor();
-    const char *material = nfc_get_tag_material();
-    const char *color_name = nfc_get_tag_color_name();
-    uint32_t color_rgba = nfc_get_tag_color_rgba();
-
     // Check if tag is already in inventory
-    bool tag_in_inventory = spool_exists_by_tag((const char*)uid_str);
+    SpoolInfo inventory_spool = {0};
+    bool tag_in_inventory = spool_get_by_tag((const char*)uid_str, &inventory_spool);
+
+    // Use inventory data if available, otherwise use NFC tag data
+    const char *vendor;
+    const char *material;
+    const char *color_name;
+    uint32_t color_rgba;
+
+    if (tag_in_inventory && inventory_spool.valid) {
+        vendor = inventory_spool.brand;
+        material = inventory_spool.material;
+        color_name = inventory_spool.color_name;
+        color_rgba = inventory_spool.color_rgba;
+        printf("[ui_nfc_card] Using inventory data: %s %s %s, color_rgba=0x%08X\n",
+               vendor, material, color_name, color_rgba);
+    } else {
+        vendor = nfc_get_tag_vendor();
+        material = nfc_get_tag_material();
+        color_name = nfc_get_tag_color_name();
+        color_rgba = nfc_get_tag_color_rgba();
+        printf("[ui_nfc_card] Using NFC tag data: %s %s %s, color_rgba=0x%08X\n",
+               vendor, material, color_name, color_rgba);
+    }
 
     // Container for spool + details (centered)
     lv_obj_t *content_container = lv_obj_create(card);
@@ -416,6 +452,7 @@ void ui_nfc_card_init(void) {
 void ui_nfc_card_cleanup(void) {
     close_popup();
     last_tag_present = false;
+    last_tag_uid[0] = '\0';
 }
 
 void ui_nfc_card_update(void) {
@@ -425,14 +462,35 @@ void ui_nfc_card_update(void) {
     // Staging is more stable - persists for 300s even if NFC reads are flaky
     bool staging_active = staging_is_active();
 
+    // Get current tag UID to detect tag changes while staging remains active
+    char current_uid[32] = "";
+    if (staging_active) {
+        nfc_get_uid_hex((uint8_t*)current_uid, sizeof(current_uid));
+    }
+
+    // Check if tag UID changed (new tag placed while popup open)
+    bool tag_changed = staging_active && last_tag_present &&
+                       current_uid[0] && last_tag_uid[0] &&
+                       strcmp(current_uid, last_tag_uid) != 0;
+
+    if (tag_changed) {
+        printf("[ui_nfc_card] Tag UID changed: %s -> %s, recreating popup\n",
+               last_tag_uid, current_uid);
+        // Close old popup and show new one with updated data
+        close_popup();
+        popup_dismissed_for_current_tag = false;
+        strncpy(last_tag_uid, current_uid, sizeof(last_tag_uid) - 1);
+        create_tag_popup();
+    }
     // Staging state changed
-    if (staging_active != last_tag_present) {
+    else if (staging_active != last_tag_present) {
         printf("[ui_nfc_card] Staging changed: %d -> %d (remaining=%.1fs)\n",
                last_tag_present, staging_active, staging_get_remaining());
         last_tag_present = staging_active;
 
         if (staging_active) {
             // Tag staged - show popup (unless dismissed for this tag)
+            strncpy(last_tag_uid, current_uid, sizeof(last_tag_uid) - 1);
             if (!popup_dismissed_for_current_tag) {
                 printf("[ui_nfc_card] Creating popup (staging active)\n");
                 create_tag_popup();
@@ -442,6 +500,7 @@ void ui_nfc_card_update(void) {
             printf("[ui_nfc_card] Closing popup (staging expired)\n");
             close_popup();
             popup_dismissed_for_current_tag = false;
+            last_tag_uid[0] = '\0';
         }
     } else if (staging_active && tag_popup) {
         // Staging still active - update weight and countdown in popup

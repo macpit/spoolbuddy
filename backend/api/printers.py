@@ -12,6 +12,7 @@ from PIL import Image
 
 from db import get_db
 from services.bambu_ftp import download_file_try_paths_async
+from services.bambu_cloud import get_cloud_service
 from models import (
     Printer,
     PrinterCreate,
@@ -106,6 +107,7 @@ async def list_printers():
         active_extruder = None
         stg_cur = -1
         stg_cur_name = None
+        tray_reading_bits = None
 
         # Get live state if connected
         if connected and _printer_manager:
@@ -122,6 +124,7 @@ async def list_printers():
                 active_extruder = state.active_extruder
                 stg_cur = state.stg_cur
                 stg_cur_name = state.stg_cur_name
+                tray_reading_bits = state.tray_reading_bits
                 # Add cover URL if printing
                 if gcode_state in ("RUNNING", "PAUSE", "PAUSED") and subtask_name:
                     cover_url = f"/api/printers/{printer.serial}/cover"
@@ -141,8 +144,38 @@ async def list_printers():
             active_extruder=active_extruder,
             stg_cur=stg_cur,
             stg_cur_name=stg_cur_name,
+            tray_reading_bits=tray_reading_bits,
         ))
 
+    return result
+
+
+# NOTE: This route must be BEFORE /{serial} routes to avoid matching "assignment-completions" as a serial
+@router.get("/assignment-completions")
+async def get_assignment_completions_endpoint(since: float = 0):
+    """Get recent assignment completion events.
+
+    Used by simulator to poll for assignment completions since it doesn't have WebSocket.
+
+    Args:
+        since: Only return events after this timestamp (Unix time)
+
+    Returns:
+        List of completion events with timestamp, serial, ams_id, tray_id, spool_id, success
+    """
+    from main import get_assignment_completions
+    completions = get_assignment_completions()
+    result = []
+    for ts, serial, ams_id, tray_id, spool_id, success in completions:
+        if ts > since:
+            result.append({
+                "timestamp": ts,
+                "serial": serial,
+                "ams_id": ams_id,
+                "tray_id": tray_id,
+                "spool_id": spool_id,
+                "success": success,
+            })
     return result
 
 
@@ -268,18 +301,28 @@ async def set_filament(serial: str, ams_id: int, tray_id: int, filament: AmsFila
         raise HTTPException(status_code=500, detail="Failed to set filament")
 
 
-@router.post("/{serial}/ams/{ams_id}/tray/{tray_id}/assign", status_code=204)
+class AssignResponse(BaseModel):
+    """Response from assign endpoint."""
+    status: str  # "configured" or "staged"
+    message: str
+    needs_replacement: bool = False  # True if slot has wrong spool that needs removal
+
+
+@router.post("/{serial}/ams/{ams_id}/tray/{tray_id}/assign", response_model=AssignResponse)
 async def assign_spool_to_tray(serial: str, ams_id: int, tray_id: int, request: AssignSpoolRequest):
     """Assign a spool from inventory to an AMS slot.
 
-    Looks up the spool data, sends filament settings to the printer,
-    and persists the assignment for usage tracking.
+    If a spool is already in the slot, configures it immediately.
+    If the slot is empty, stages the assignment to be applied when spool is inserted.
 
     Args:
         serial: Printer serial number
         ams_id: AMS unit ID (0-3 for regular AMS, 128-135 for AMS-HT, 254/255 for external)
         tray_id: Tray ID within AMS (0-3 for regular AMS, 0 for HT/external)
         request: Assignment request with spool_id
+
+    Returns:
+        AssignResponse with status ("configured" or "staged") and message
     """
     if not _printer_manager:
         raise HTTPException(status_code=500, detail="Printer manager not available")
@@ -312,28 +355,204 @@ async def assign_spool_to_tray(serial: str, ams_id: int, tray_id: int, request: 
     material = (spool.material or "").upper()
     temp_min, temp_max = temp_ranges.get(material, (190, 250))
 
-    # Build tray_info_idx - this is typically a manufacturer preset ID
-    # For generic filaments, we use empty string
-    tray_info_idx = ""
+    # Build tray_info_idx and setting_id from slicer_filament
+    # Bambu format: setting_id like "GFSL05" or "GFSA01", tray_info_idx like "GFL05" or "GFA01"
+    # Some IDs have version suffix like "GFSL05_07" - strip it for compatibility
+    # User-created custom filaments have PFUS* prefix and need special handling
+    slicer_filament = spool.slicer_filament or ""
 
-    success = _printer_manager.set_filament(
-        serial=serial,
-        ams_id=ams_id,
-        tray_id=tray_id,
-        tray_info_idx=tray_info_idx,
-        tray_type=spool.material or "",
-        tray_color=tray_color,
-        nozzle_temp_min=temp_min,
-        nozzle_temp_max=temp_max,
-    )
+    # Strip version suffix if present (e.g., GFSL05_07 -> GFSL05)
+    if "_" in slicer_filament:
+        setting_id = slicer_filament.split("_")[0]
+    else:
+        setting_id = slicer_filament
 
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to assign spool")
+    # Convert setting_id to filament_id for tray_info_idx
+    # Generic filament IDs for when we need a fallback
+    generic_filament_ids = {
+        "PLA": "GFL99",
+        "PETG": "GFG99",
+        "ABS": "GFB99",
+        "ASA": "GFB98",
+        "TPU": "GFU99",
+        "PA": "GFN99",
+        "PC": "GFC99",
+        "PVA": "GFS99",
+    }
 
-    # Persist assignment for usage tracking
-    await db.assign_spool_to_slot(request.spool_id, serial, ams_id, tray_id)
+    if setting_id.startswith("GFS"):
+        # Bambu preset: GFSL05 -> GFL05
+        tray_info_idx = "GF" + setting_id[3:]
+    elif setting_id.startswith("PFUS") or setting_id.startswith("PFSP"):
+        # User-created custom filament - fetch filament_id from cloud
+        # The cloud returns a P-prefix filament_id (e.g., "P4d64437") that should be used as tray_info_idx
+        cloud = get_cloud_service()
+        if not cloud.is_authenticated:
+            token = await db.get_setting("cloud_access_token")
+            if token:
+                cloud.set_token(token)
 
-    logger.info(f"Assigned spool {spool.id} ({spool.material}) to {serial} AMS {ams_id} tray {tray_id}")
+        preset_detail = await cloud.get_setting_detail(slicer_filament)
+        if preset_detail:
+            # filament_id is at root level or in setting.filament_id
+            cloud_filament_id = preset_detail.get("filament_id")
+            if not cloud_filament_id and preset_detail.get("setting"):
+                cloud_filament_id = preset_detail["setting"].get("filament_id")
+
+            if cloud_filament_id:
+                tray_info_idx = cloud_filament_id
+                logger.info(f"Custom preset {slicer_filament} -> filament_id={cloud_filament_id}")
+            else:
+                # Fallback to generic if no filament_id found
+                tray_info_idx = generic_filament_ids.get(material, "GFL99")
+                logger.warning(f"No filament_id in cloud response for {slicer_filament}, using: {tray_info_idx}")
+        else:
+            # Fallback if cloud lookup fails
+            tray_info_idx = generic_filament_ids.get(material, "GFL99")
+            logger.warning(f"Cloud lookup failed for {slicer_filament}, using: {tray_info_idx}")
+        setting_id = slicer_filament
+    else:
+        tray_info_idx = setting_id
+
+    logger.info(f"Setting filament: slicer={slicer_filament} -> tray_info_idx={tray_info_idx}, setting_id={setting_id}, type={spool.material}, color={tray_color}")
+
+    # Look up K-profile for this spool, printer, and nozzle diameter
+    nozzle_diameter = _printer_manager.get_nozzle_diameter(serial)
+    k_profiles = await db.get_spool_k_profiles(request.spool_id)
+    matching_cali_idx = -1  # Default: no specific profile
+
+    for kp in k_profiles:
+        # Match by printer and nozzle diameter
+        if kp.get("printer_serial") == serial and kp.get("nozzle_diameter") == nozzle_diameter:
+            matching_cali_idx = kp.get("cali_idx", -1)
+            logger.info(f"Found matching K-profile for spool {request.spool_id}: cali_idx={matching_cali_idx}, name={kp.get('name')}")
+            break
+
+    if matching_cali_idx == -1:
+        logger.info(f"No matching K-profile found for spool {request.spool_id} on printer {serial} with nozzle {nozzle_diameter}")
+
+    # Check if tray has a spool and if it matches the one we're assigning
+    state = _printer_manager.get_state(serial)
+    tray_has_spool = False
+    tray_matches_spool = False
+    current_tray_info = None
+
+    if state:
+        for unit in state.ams_units:
+            if unit.id == ams_id:
+                for tray in unit.trays:
+                    if tray.tray_id == tray_id:
+                        if tray.tray_type:
+                            tray_has_spool = True
+                            current_tray_info = tray
+
+                            # Check if current tray matches spool being assigned
+                            # Compare tray_info_idx (Bambu preset ID) if available
+                            current_info_idx = tray.tray_info_idx or ""
+
+                            # Also compare material type and color as fallback
+                            current_type = (tray.tray_type or "").upper()
+                            target_type = (spool.material or "").upper()
+
+                            # Color comparison: tray_color is RRGGBBAA hex string
+                            current_color = (tray.tray_color or "").upper()
+                            target_color = tray_color.upper()
+
+                            # Match if preset ID matches OR (material AND color match)
+                            if tray_info_idx and current_info_idx:
+                                tray_matches_spool = (current_info_idx == tray_info_idx)
+                            else:
+                                # Fallback: compare material and color
+                                tray_matches_spool = (current_type == target_type and
+                                                      current_color == target_color)
+
+                            logger.info(f"Tray comparison: current_idx={current_info_idx}, target_idx={tray_info_idx}, "
+                                        f"current_type={current_type}, target_type={target_type}, "
+                                        f"current_color={current_color}, target_color={target_color}, "
+                                        f"matches={tray_matches_spool}")
+                        break
+
+    if tray_has_spool and tray_matches_spool:
+        # Try immediate configuration
+        success = _printer_manager.set_filament(
+            serial=serial,
+            ams_id=ams_id,
+            tray_id=tray_id,
+            tray_info_idx=tray_info_idx,
+            setting_id=setting_id,
+            tray_type=spool.material or "",
+            tray_color=tray_color,
+            nozzle_temp_min=temp_min,
+            nozzle_temp_max=temp_max,
+        )
+
+        # Also send extrusion_cali_sel to set K-profile (like SpoolEase does)
+        _printer_manager.set_calibration(
+            serial=serial,
+            ams_id=ams_id,
+            tray_id=tray_id,
+            cali_idx=matching_cali_idx,
+            filament_id=tray_info_idx,
+            nozzle_diameter=nozzle_diameter,
+        )
+
+        if success:
+            # Persist assignment for usage tracking
+            await db.assign_spool_to_slot(request.spool_id, serial, ams_id, tray_id)
+            logger.info(f"Assigned spool {spool.id} ({spool.material}) to {serial} AMS {ams_id} tray {tray_id}")
+            return AssignResponse(status="configured", message="Slot configured successfully")
+        else:
+            raise HTTPException(status_code=500, detail="Failed to configure slot")
+    else:
+        # Send configuration immediately (non-Bambu spools have no RFID for AMS detection)
+        _printer_manager.set_filament(
+            serial=serial,
+            ams_id=ams_id,
+            tray_id=tray_id,
+            tray_info_idx=tray_info_idx,
+            setting_id=setting_id,
+            tray_type=spool.material or "",
+            tray_color=tray_color,
+            nozzle_temp_min=temp_min,
+            nozzle_temp_max=temp_max,
+        )
+
+        # Also send extrusion_cali_sel to set K-profile (like SpoolEase does)
+        _printer_manager.set_calibration(
+            serial=serial,
+            ams_id=ams_id,
+            tray_id=tray_id,
+            cali_idx=matching_cali_idx,
+            filament_id=tray_info_idx,
+            nozzle_diameter=nozzle_diameter,
+        )
+
+        # Also stage so UI flow continues as expected
+        _printer_manager.stage_assignment(
+            serial=serial,
+            ams_id=ams_id,
+            tray_id=tray_id,
+            spool_id=request.spool_id,
+            tray_info_idx=tray_info_idx,
+            setting_id=setting_id,
+            tray_type=spool.material or "",
+            tray_color=tray_color,
+            nozzle_temp_min=temp_min,
+            nozzle_temp_max=temp_max,
+            cali_idx=matching_cali_idx,
+            nozzle_diameter=nozzle_diameter,
+        )
+
+        # Determine message based on whether slot has wrong spool or is empty
+        needs_replacement = tray_has_spool and not tray_matches_spool
+        if needs_replacement:
+            message = "Replace spool to configure slot"
+            logger.info(f"Staged assignment (replacement needed) for spool {spool.id} ({spool.material}) to {serial} AMS {ams_id} tray {tray_id}")
+        else:
+            message = "Insert spool to configure slot"
+            logger.info(f"Staged assignment for spool {spool.id} ({spool.material}) to {serial} AMS {ams_id} tray {tray_id}")
+
+        return AssignResponse(status="staged", message=message, needs_replacement=needs_replacement)
 
 
 @router.delete("/{serial}/ams/{ams_id}/tray/{tray_id}/assign", status_code=204)
@@ -341,10 +560,31 @@ async def unassign_spool_from_tray(serial: str, ams_id: int, tray_id: int):
     """Remove spool assignment from an AMS slot.
 
     This only removes the tracking assignment, not the filament setting on the printer.
+    Also cancels any pending staged assignment.
     """
+    # Cancel any pending staged assignment
+    if _printer_manager:
+        _printer_manager.cancel_assignment(serial, ams_id, tray_id)
+
     db = await get_db()
     await db.unassign_slot(serial, ams_id, tray_id)
     logger.info(f"Unassigned spool from {serial} AMS {ams_id} tray {tray_id}")
+
+
+@router.post("/{serial}/ams/{ams_id}/tray/{tray_id}/cancel-staged", status_code=204)
+async def cancel_staged_assignment(serial: str, ams_id: int, tray_id: int):
+    """Cancel a staged assignment for an AMS slot.
+
+    Use this to cancel a pending assignment before the spool is inserted.
+    """
+    if not _printer_manager:
+        raise HTTPException(status_code=500, detail="Printer manager not available")
+
+    cancelled = _printer_manager.cancel_assignment(serial, ams_id, tray_id)
+    if not cancelled:
+        raise HTTPException(status_code=404, detail="No staged assignment found")
+
+    logger.info(f"Cancelled staged assignment for {serial} AMS {ams_id} tray {tray_id}")
 
 
 @router.get("/{serial}/assignments")
@@ -355,6 +595,29 @@ async def get_slot_assignments(serial: str):
     """
     db = await get_db()
     return await db.get_slot_assignments(serial)
+
+
+@router.get("/{serial}/pending-assignments")
+async def get_pending_assignments(serial: str):
+    """Get all pending (staged) assignments for a printer.
+
+    Returns list of pending assignments waiting for spool insertion.
+    Used by simulator to poll for staged assignments.
+    """
+    if not _printer_manager:
+        return []
+
+    pending = _printer_manager.get_all_pending_assignments(serial)
+    result = []
+    for (ams_id, tray_id), assignment in pending.items():
+        result.append({
+            "ams_id": ams_id,
+            "tray_id": tray_id,
+            "spool_id": assignment.spool_id,
+            "tray_type": assignment.tray_type,
+            "tray_color": assignment.tray_color,
+        })
+    return result
 
 
 @router.post("/{serial}/ams/{ams_id}/tray/{tray_id}/reset", status_code=204)

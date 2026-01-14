@@ -218,6 +218,9 @@ static void parse_printer_state(cJSON *state_json, BackendPrinterState *printer)
     item = cJSON_GetObjectItem(state_json, "active_extruder");
     printer->active_extruder = item && !cJSON_IsNull(item) ? item->valueint : -1;
 
+    item = cJSON_GetObjectItem(state_json, "tray_reading_bits");
+    printer->tray_reading_bits = item && !cJSON_IsNull(item) ? item->valueint : -1;
+
     // Parse AMS units
     cJSON *ams_units = cJSON_GetObjectItem(state_json, "ams_units");
     printer->ams_unit_count = 0;
@@ -420,7 +423,7 @@ int backend_poll(void) {
             if (item && item->valuestring) strncpy(g_tag_color_name, item->valuestring, sizeof(g_tag_color_name) - 1);
 
             item = cJSON_GetObjectItem(tag_data, "color_rgba");
-            if (item) g_tag_color_rgba = (uint32_t)item->valueint;
+            if (item) g_tag_color_rgba = (uint32_t)item->valuedouble;  // Use valuedouble for large unsigned values
 
             item = cJSON_GetObjectItem(tag_data, "spool_weight");
             if (item) g_tag_spool_weight = item->valueint;
@@ -670,6 +673,13 @@ int backend_get_active_extruder(int printer_index) {
     return g_state.printers[printer_index].active_extruder;
 }
 
+int backend_get_tray_reading_bits(int printer_index) {
+    if (printer_index < 0 || printer_index >= g_state.printer_count) {
+        return -1;
+    }
+    return g_state.printers[printer_index].tray_reading_bits;
+}
+
 // Cover image handling - simulator uses file-based approach
 static uint8_t *g_cover_data = NULL;
 static uint32_t g_cover_data_size = 0;
@@ -733,6 +743,96 @@ bool spool_exists_by_tag(const char *tag_id) {
                 cJSON *spool = cJSON_GetArrayItem(json, i);
                 cJSON *tid = cJSON_GetObjectItem(spool, "tag_id");
                 if (tid && tid->valuestring && strcmp(tid->valuestring, tag_id) == 0) {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        cJSON_Delete(json);
+    }
+
+    free(response.data);
+    return found;
+}
+
+bool spool_get_by_tag(const char *tag_id, SpoolInfo *info) {
+    if (!tag_id || !info || !g_curl) {
+        if (info) info->valid = false;
+        return false;
+    }
+
+    memset(info, 0, sizeof(SpoolInfo));
+
+    char url[512];
+    snprintf(url, sizeof(url), "%s/api/spools", g_base_url);
+
+    ResponseBuffer response = {0};
+
+    curl_easy_reset(g_curl);
+    curl_easy_setopt(g_curl, CURLOPT_URL, url);
+    curl_easy_setopt(g_curl, CURLOPT_WRITEFUNCTION, write_callback);
+    curl_easy_setopt(g_curl, CURLOPT_WRITEDATA, &response);
+    curl_easy_setopt(g_curl, CURLOPT_TIMEOUT, 5L);
+
+    CURLcode res = curl_easy_perform(g_curl);
+
+    bool found = false;
+    if (res == CURLE_OK && response.data) {
+        cJSON *json = cJSON_Parse(response.data);
+        if (json && cJSON_IsArray(json)) {
+            int count = cJSON_GetArraySize(json);
+            for (int i = 0; i < count; i++) {
+                cJSON *spool = cJSON_GetArrayItem(json, i);
+                cJSON *tid = cJSON_GetObjectItem(spool, "tag_id");
+                if (tid && tid->valuestring && strcmp(tid->valuestring, tag_id) == 0) {
+                    // Found - extract fields
+                    cJSON *id_field = cJSON_GetObjectItem(spool, "id");
+                    if (id_field && id_field->valuestring) {
+                        strncpy(info->id, id_field->valuestring, sizeof(info->id) - 1);
+                    }
+                    strncpy(info->tag_id, tag_id, sizeof(info->tag_id) - 1);
+
+                    cJSON *field;
+                    field = cJSON_GetObjectItem(spool, "brand");
+                    if (field && field->valuestring) strncpy(info->brand, field->valuestring, sizeof(info->brand) - 1);
+
+                    field = cJSON_GetObjectItem(spool, "material");
+                    if (field && field->valuestring) strncpy(info->material, field->valuestring, sizeof(info->material) - 1);
+
+                    field = cJSON_GetObjectItem(spool, "subtype");
+                    if (field && field->valuestring) strncpy(info->subtype, field->valuestring, sizeof(info->subtype) - 1);
+
+                    field = cJSON_GetObjectItem(spool, "color_name");
+                    if (field && field->valuestring) strncpy(info->color_name, field->valuestring, sizeof(info->color_name) - 1);
+
+                    field = cJSON_GetObjectItem(spool, "rgba");
+                    if (field && field->valuestring) {
+                        // Handle both RRGGBB (6 chars) and RRGGBBAA (8 chars) formats
+                        char rgba_padded[16] = {0};
+                        size_t len = strlen(field->valuestring);
+                        strncpy(rgba_padded, field->valuestring, sizeof(rgba_padded) - 1);
+                        if (len == 6) {
+                            // Pad with FF for full alpha
+                            strcat(rgba_padded, "FF");
+                        }
+                        info->color_rgba = (uint32_t)strtoul(rgba_padded, NULL, 16);
+                        printf("[backend] spool_get_by_tag: rgba string='%s' (padded='%s') -> color_rgba=0x%08X\n",
+                               field->valuestring, rgba_padded, info->color_rgba);
+                    }
+
+                    field = cJSON_GetObjectItem(spool, "label_weight");
+                    if (field && cJSON_IsNumber(field)) info->label_weight = field->valueint;
+
+                    field = cJSON_GetObjectItem(spool, "weight_current");
+                    if (field && cJSON_IsNumber(field)) info->weight_current = field->valueint;
+
+                    field = cJSON_GetObjectItem(spool, "slicer_filament");
+                    if (field && field->valuestring) strncpy(info->slicer_filament, field->valuestring, sizeof(info->slicer_filament) - 1);
+
+                    field = cJSON_GetObjectItem(spool, "tag_type");
+                    if (field && field->valuestring) strncpy(info->tag_type, field->valuestring, sizeof(info->tag_type) - 1);
+
+                    info->valid = true;
                     found = true;
                     break;
                 }
@@ -820,6 +920,359 @@ bool spool_add_to_inventory(const char *tag_id, const char *vendor, const char *
     }
 
     free(response.data);
+    return success;
+}
+
+// Get K-profiles for a spool by spool ID
+int spool_get_k_profiles(const char *spool_id, SpoolKProfile *profiles, int max_profiles) {
+    if (!spool_id || !profiles || max_profiles <= 0 || !g_curl) {
+        return 0;
+    }
+
+    char url[512];
+    snprintf(url, sizeof(url), "%s/api/spools/%s/k-profiles", g_base_url, spool_id);
+
+    ResponseBuffer response = {0};
+
+    curl_easy_reset(g_curl);
+    curl_easy_setopt(g_curl, CURLOPT_URL, url);
+    curl_easy_setopt(g_curl, CURLOPT_WRITEFUNCTION, write_callback);
+    curl_easy_setopt(g_curl, CURLOPT_WRITEDATA, &response);
+    curl_easy_setopt(g_curl, CURLOPT_TIMEOUT, 5L);
+
+    CURLcode res = curl_easy_perform(g_curl);
+
+    int count = 0;
+    if (res == CURLE_OK && response.data) {
+        cJSON *json = cJSON_Parse(response.data);
+        if (json && cJSON_IsArray(json)) {
+            int array_size = cJSON_GetArraySize(json);
+            for (int i = 0; i < array_size && count < max_profiles; i++) {
+                cJSON *item = cJSON_GetArrayItem(json, i);
+                if (!item) continue;
+
+                SpoolKProfile *p = &profiles[count];
+                memset(p, 0, sizeof(SpoolKProfile));
+                p->extruder = -1;  // Default: single-nozzle
+                p->cali_idx = -1;
+
+                cJSON *field;
+                field = cJSON_GetObjectItem(item, "printer_serial");
+                if (field && field->valuestring) {
+                    strncpy(p->printer_serial, field->valuestring, sizeof(p->printer_serial) - 1);
+                }
+
+                field = cJSON_GetObjectItem(item, "extruder");
+                if (field && cJSON_IsNumber(field)) {
+                    p->extruder = field->valueint;
+                } else if (field && cJSON_IsNull(field)) {
+                    p->extruder = -1;
+                }
+
+                field = cJSON_GetObjectItem(item, "k_value");
+                if (field && field->valuestring) {
+                    strncpy(p->k_value, field->valuestring, sizeof(p->k_value) - 1);
+                }
+
+                field = cJSON_GetObjectItem(item, "name");
+                if (field && field->valuestring) {
+                    strncpy(p->name, field->valuestring, sizeof(p->name) - 1);
+                }
+
+                field = cJSON_GetObjectItem(item, "cali_idx");
+                if (field && cJSON_IsNumber(field)) {
+                    p->cali_idx = field->valueint;
+                }
+
+                count++;
+            }
+        }
+        cJSON_Delete(json);
+    }
+
+    free(response.data);
+    printf("[backend] spool_get_k_profiles(%s): found %d profiles\n", spool_id, count);
+    return count;
+}
+
+// Get K-profile for a spool matching a specific printer
+bool spool_get_k_profile_for_printer(const char *spool_id, const char *printer_serial, SpoolKProfile *profile) {
+    if (!spool_id || !printer_serial || !profile) {
+        printf("[backend] spool_get_k_profile_for_printer: invalid params (spool=%s, serial=%s)\n",
+               spool_id ? spool_id : "NULL", printer_serial ? printer_serial : "NULL");
+        return false;
+    }
+
+    printf("[backend] Looking for K-profile: spool=%s, printer=%s\n", spool_id, printer_serial);
+
+    SpoolKProfile profiles[16];
+    int count = spool_get_k_profiles(spool_id, profiles, 16);
+
+    for (int i = 0; i < count; i++) {
+        printf("[backend] K-profile %d: printer_serial='%s', cali_idx=%d, k_value=%s\n",
+               i, profiles[i].printer_serial, profiles[i].cali_idx, profiles[i].k_value);
+        if (strcmp(profiles[i].printer_serial, printer_serial) == 0) {
+            memcpy(profile, &profiles[i], sizeof(SpoolKProfile));
+            printf("[backend] Found matching K-profile: cali_idx=%d\n", profile->cali_idx);
+            return true;
+        }
+    }
+
+    printf("[backend] No matching K-profile found for printer %s\n", printer_serial);
+    return false;
+}
+
+// =============================================================================
+// AMS Slot Assignment functions
+// =============================================================================
+
+AssignResult backend_assign_spool_to_tray(const char *printer_serial, int ams_id, int tray_id,
+                                           const char *spool_id) {
+    if (!printer_serial || !spool_id || !g_curl) {
+        printf("[backend] assign_spool_to_tray: invalid params\n");
+        return ASSIGN_RESULT_ERROR;
+    }
+
+    // POST /api/printers/{serial}/ams/{ams_id}/tray/{tray_id}/assign
+    char url[512];
+    snprintf(url, sizeof(url), "%s/api/printers/%s/ams/%d/tray/%d/assign",
+             g_base_url, printer_serial, ams_id, tray_id);
+
+    // Build JSON payload: {"spool_id": "..."}
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddStringToObject(json, "spool_id", spool_id);
+    char *json_str = cJSON_PrintUnformatted(json);
+    cJSON_Delete(json);
+
+    if (!json_str) {
+        printf("[backend] assign_spool_to_tray: failed to create JSON\n");
+        return ASSIGN_RESULT_ERROR;
+    }
+
+    printf("[backend] assign_spool_to_tray: POST %s\n", url);
+    printf("[backend] payload: %s\n", json_str);
+
+    ResponseBuffer response = {0};
+    struct curl_slist *headers = NULL;
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+
+    curl_easy_reset(g_curl);
+    curl_easy_setopt(g_curl, CURLOPT_URL, url);
+    curl_easy_setopt(g_curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(g_curl, CURLOPT_POSTFIELDS, json_str);
+    curl_easy_setopt(g_curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(g_curl, CURLOPT_WRITEFUNCTION, write_callback);
+    curl_easy_setopt(g_curl, CURLOPT_WRITEDATA, &response);
+    curl_easy_setopt(g_curl, CURLOPT_TIMEOUT, 10L);
+
+    CURLcode res = curl_easy_perform(g_curl);
+
+    long http_code = 0;
+    curl_easy_getinfo(g_curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+    curl_slist_free_all(headers);
+    free(json_str);
+
+    AssignResult result = ASSIGN_RESULT_ERROR;
+
+    if (res == CURLE_OK && http_code == 200 && response.data) {
+        // Parse JSON response: {"status": "configured"|"staged", "message": "...", "needs_replacement": bool}
+        cJSON *resp_json = cJSON_Parse(response.data);
+        if (resp_json) {
+            cJSON *status = cJSON_GetObjectItem(resp_json, "status");
+            cJSON *needs_replacement = cJSON_GetObjectItem(resp_json, "needs_replacement");
+            if (status && cJSON_IsString(status)) {
+                if (strcmp(status->valuestring, "configured") == 0) {
+                    result = ASSIGN_RESULT_CONFIGURED;
+                } else if (strcmp(status->valuestring, "staged") == 0) {
+                    // Check if needs replacement
+                    if (needs_replacement && cJSON_IsTrue(needs_replacement)) {
+                        result = ASSIGN_RESULT_STAGED_REPLACE;
+                    } else {
+                        result = ASSIGN_RESULT_STAGED;
+                    }
+                }
+            }
+            cJSON_Delete(resp_json);
+        }
+    }
+
+    if (response.data) free(response.data);
+
+    printf("[backend] assign_spool_to_tray: result=%d, http=%ld, assign_result=%d\n",
+           res, http_code, result);
+
+    return result;
+}
+
+bool backend_cancel_staged_assignment(const char *printer_serial, int ams_id, int tray_id) {
+    if (!printer_serial || !g_curl) {
+        printf("[backend] cancel_staged_assignment: invalid params\n");
+        return false;
+    }
+
+    // POST /api/printers/{serial}/ams/{ams_id}/tray/{tray_id}/cancel-staged
+    char url[512];
+    snprintf(url, sizeof(url), "%s/api/printers/%s/ams/%d/tray/%d/cancel-staged",
+             g_base_url, printer_serial, ams_id, tray_id);
+
+    printf("[backend] cancel_staged_assignment: POST %s\n", url);
+
+    ResponseBuffer response = {0};
+    curl_easy_reset(g_curl);
+    curl_easy_setopt(g_curl, CURLOPT_URL, url);
+    curl_easy_setopt(g_curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(g_curl, CURLOPT_POSTFIELDS, "");
+    curl_easy_setopt(g_curl, CURLOPT_WRITEFUNCTION, write_callback);
+    curl_easy_setopt(g_curl, CURLOPT_WRITEDATA, &response);
+    curl_easy_setopt(g_curl, CURLOPT_TIMEOUT, 5L);
+
+    CURLcode res = curl_easy_perform(g_curl);
+
+    long http_code = 0;
+    curl_easy_getinfo(g_curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+    if (response.data) free(response.data);
+
+    bool success = (res == CURLE_OK && http_code == 204);
+    printf("[backend] cancel_staged_assignment: result=%d, http=%ld, success=%d\n",
+           res, http_code, success);
+
+    return success;
+}
+
+int backend_poll_assignment_completions(double since_timestamp, AssignmentCompletion *events, int max_events) {
+    if (!events || max_events <= 0 || !g_curl) {
+        return 0;
+    }
+
+    // GET /api/printers/assignment-completions?since=<timestamp>
+    char url[512];
+    snprintf(url, sizeof(url), "%s/api/printers/assignment-completions?since=%.6f",
+             g_base_url, since_timestamp);
+
+    // Only log occasionally to avoid spam (every ~10 calls)
+    static int poll_count = 0;
+    bool should_log = (poll_count % 10 == 0);
+    poll_count++;
+
+    if (should_log) {
+        printf("[backend] Polling for completions since %.3f\n", since_timestamp);
+    }
+
+    ResponseBuffer response = {0};
+    curl_easy_reset(g_curl);
+    curl_easy_setopt(g_curl, CURLOPT_URL, url);
+    curl_easy_setopt(g_curl, CURLOPT_WRITEFUNCTION, write_callback);
+    curl_easy_setopt(g_curl, CURLOPT_WRITEDATA, &response);
+    curl_easy_setopt(g_curl, CURLOPT_TIMEOUT, 2L);
+
+    CURLcode res = curl_easy_perform(g_curl);
+
+    long http_code = 0;
+    curl_easy_getinfo(g_curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+    int count = 0;
+    if (res == CURLE_OK && http_code == 200 && response.data) {
+        cJSON *json = cJSON_Parse(response.data);
+        if (json && cJSON_IsArray(json)) {
+            int array_size = cJSON_GetArraySize(json);
+            for (int i = 0; i < array_size && count < max_events; i++) {
+                cJSON *item = cJSON_GetArrayItem(json, i);
+                if (!item) continue;
+
+                AssignmentCompletion *evt = &events[count];
+                memset(evt, 0, sizeof(*evt));
+
+                cJSON *ts = cJSON_GetObjectItem(item, "timestamp");
+                cJSON *serial = cJSON_GetObjectItem(item, "serial");
+                cJSON *ams_id = cJSON_GetObjectItem(item, "ams_id");
+                cJSON *tray_id = cJSON_GetObjectItem(item, "tray_id");
+                cJSON *spool_id = cJSON_GetObjectItem(item, "spool_id");
+                cJSON *success = cJSON_GetObjectItem(item, "success");
+
+                if (ts && cJSON_IsNumber(ts)) evt->timestamp = ts->valuedouble;
+                if (serial && cJSON_IsString(serial))
+                    strncpy(evt->serial, serial->valuestring, sizeof(evt->serial) - 1);
+                if (ams_id && cJSON_IsNumber(ams_id)) evt->ams_id = ams_id->valueint;
+                if (tray_id && cJSON_IsNumber(tray_id)) evt->tray_id = tray_id->valueint;
+                if (spool_id && cJSON_IsString(spool_id))
+                    strncpy(evt->spool_id, spool_id->valuestring, sizeof(evt->spool_id) - 1);
+                if (success && cJSON_IsBool(success)) evt->success = cJSON_IsTrue(success);
+
+                count++;
+            }
+            cJSON_Delete(json);
+        }
+    }
+
+    if (count > 0) {
+        printf("[backend] Found %d assignment completion(s)!\n", count);
+        for (int i = 0; i < count; i++) {
+            printf("[backend]   Completion %d: serial=%s, ams=%d, tray=%d, success=%d\n",
+                   i, events[i].serial, events[i].ams_id, events[i].tray_id, events[i].success);
+        }
+    }
+
+    if (response.data) free(response.data);
+    return count;
+}
+
+bool backend_set_tray_calibration(const char *printer_serial, int ams_id, int tray_id,
+                                   int cali_idx, const char *filament_id,
+                                   const char *nozzle_diameter) {
+    if (!printer_serial || !g_curl) {
+        printf("[backend] set_tray_calibration: invalid params\n");
+        return false;
+    }
+
+    // POST /api/printers/{serial}/ams/{ams_id}/tray/{tray_id}/calibration
+    char url[512];
+    snprintf(url, sizeof(url), "%s/api/printers/%s/ams/%d/tray/%d/calibration",
+             g_base_url, printer_serial, ams_id, tray_id);
+
+    // Build JSON payload
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddNumberToObject(json, "cali_idx", cali_idx);
+    cJSON_AddStringToObject(json, "filament_id", filament_id ? filament_id : "");
+    cJSON_AddStringToObject(json, "nozzle_diameter", nozzle_diameter ? nozzle_diameter : "0.4");
+    char *json_str = cJSON_PrintUnformatted(json);
+    cJSON_Delete(json);
+
+    if (!json_str) {
+        printf("[backend] set_tray_calibration: failed to create JSON\n");
+        return false;
+    }
+
+    printf("[backend] set_tray_calibration: POST %s\n", url);
+    printf("[backend] payload: %s\n", json_str);
+
+    ResponseBuffer response = {0};
+    struct curl_slist *headers = NULL;
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+
+    curl_easy_reset(g_curl);
+    curl_easy_setopt(g_curl, CURLOPT_URL, url);
+    curl_easy_setopt(g_curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(g_curl, CURLOPT_POSTFIELDS, json_str);
+    curl_easy_setopt(g_curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(g_curl, CURLOPT_WRITEFUNCTION, write_callback);
+    curl_easy_setopt(g_curl, CURLOPT_WRITEDATA, &response);
+    curl_easy_setopt(g_curl, CURLOPT_TIMEOUT, 10L);
+
+    CURLcode res = curl_easy_perform(g_curl);
+
+    long http_code = 0;
+    curl_easy_getinfo(g_curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+    curl_slist_free_all(headers);
+    free(json_str);
+    if (response.data) free(response.data);
+
+    bool success = (res == CURLE_OK && (http_code == 200 || http_code == 204));
+    printf("[backend] set_tray_calibration: result=%d, http=%ld, success=%d\n",
+           res, http_code, success);
+
     return success;
 }
 
@@ -932,7 +1385,7 @@ static void fetch_tag_data_from_backend(const char *tag_uid_hex) {
             if (item && item->valuestring) strncpy(g_tag_color_name, item->valuestring, sizeof(g_tag_color_name) - 1);
 
             item = cJSON_GetObjectItem(json, "color_rgba");
-            if (item) g_tag_color_rgba = (uint32_t)item->valueint;
+            if (item) g_tag_color_rgba = (uint32_t)item->valuedouble;  // Use valuedouble for large unsigned values
 
             item = cJSON_GetObjectItem(json, "spool_weight");
             if (item) g_tag_spool_weight = item->valueint;

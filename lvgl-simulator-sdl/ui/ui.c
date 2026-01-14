@@ -217,12 +217,32 @@ void wire_ams_overview_buttons(void) {
     wire_ams_printer_dropdown();
 }
 
+// Handler for scan_result printer dropdown change - re-inits screen after printer selection updates
+static void scan_result_printer_reinit(lv_event_t *e) {
+    (void)e;
+    // Re-initialize the screen with the new printer's AMS configuration
+    // This runs AFTER printer_dropdown_changed() updates the selected_printer_index
+    ui_scan_result_init();
+}
+
 void wire_scan_result_buttons(void) {
     // Back button - make it clickable
     if (objects.scan_screen_top_bar_icon_back) {
         lv_obj_add_flag(objects.scan_screen_top_bar_icon_back, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_add_event_cb(objects.scan_screen_top_bar_icon_back, back_click_handler, LV_EVENT_CLICKED, NULL);
     }
+
+    // Wire main printer dropdown handler (updates selected_printer_index)
+    wire_scan_result_printer_dropdown();
+
+    // Add re-init handler that runs after printer selection changes
+    if (objects.scan_screen_top_bar_printer_select) {
+        lv_obj_add_event_cb(objects.scan_screen_top_bar_printer_select, scan_result_printer_reinit,
+                           LV_EVENT_VALUE_CHANGED, NULL);
+    }
+
+    // Wire assign button
+    ui_scan_result_wire_assign_button();
 }
 
 void wire_spool_details_buttons(void) {
