@@ -2276,21 +2276,27 @@ static void led_pulse_anim_cb(void *var, int32_t value) {
  */
 static void staging_status_click_handler(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
+    bool staging = staging_is_active();
+    printf("[ui_backend] Status bar event: code=%d, staging=%d\n", code, staging);
+
     if (code == LV_EVENT_CLICKED) {
-        if (staging_is_active()) {
+        if (staging) {
             printf("[ui_backend] Status bar clicked - showing popup\n");
             ui_nfc_card_show_popup();
+        } else {
+            printf("[ui_backend] Status bar clicked but staging not active!\n");
         }
     } else if (code == LV_EVENT_LONG_PRESSED) {
-        if (staging_is_active()) {
+        if (staging) {
             printf("[ui_backend] Status bar long-pressed - clearing staging\n");
             staging_clear();
         }
     }
 }
 
-// Track if click handler is installed
+// Track if click handler is installed and on which object
 static bool staging_click_handler_installed = false;
+static lv_obj_t *staging_click_handler_target = NULL;
 
 // Clear button for status bar
 static lv_obj_t *staging_clear_btn = NULL;
@@ -2351,11 +2357,14 @@ static void update_status_bar(void) {
         lv_obj_set_style_text_color(objects.bottom_bar_message, lv_color_hex(0x00FF88), 0);  // Green
 
         // Make the bottom bar clickable
-        if (!staging_click_handler_installed && objects.bottom_bar) {
+        // Reinstall handler if target object changed (screen recreated)
+        if (objects.bottom_bar && objects.bottom_bar != staging_click_handler_target) {
             lv_obj_add_flag(objects.bottom_bar, LV_OBJ_FLAG_CLICKABLE);
             lv_obj_add_event_cb(objects.bottom_bar, staging_status_click_handler, LV_EVENT_CLICKED, NULL);
             lv_obj_add_event_cb(objects.bottom_bar, staging_status_click_handler, LV_EVENT_LONG_PRESSED, NULL);
             staging_click_handler_installed = true;
+            staging_click_handler_target = objects.bottom_bar;
+            printf("[status_bar] Click handler installed on bottom_bar %p\n", (void*)objects.bottom_bar);
         }
 
         // Show LED with green color, gentle pulse

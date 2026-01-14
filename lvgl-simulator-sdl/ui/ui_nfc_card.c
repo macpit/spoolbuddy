@@ -27,13 +27,14 @@ extern const char* nfc_get_tag_color_name(void);
 extern uint32_t nfc_get_tag_color_rgba(void);
 extern int nfc_get_tag_spool_weight(void);
 extern const char* nfc_get_tag_type(void);
+extern const char* nfc_get_tag_slicer_filament(void);
 
 // Spool inventory functions (backend API)
 extern bool spool_exists_by_tag(const char *tag_id);
 extern bool spool_add_to_inventory(const char *tag_id, const char *vendor, const char *material,
                                     const char *subtype, const char *color_name, uint32_t color_rgba,
                                     int label_weight, int weight_current, const char *data_origin,
-                                    const char *tag_type);
+                                    const char *tag_type, const char *slicer_filament);
 
 // External Rust FFI functions - Scale
 extern float scale_get_weight(void);
@@ -92,9 +93,9 @@ static void close_popup_timer_cb(lv_timer_t *timer) {
     close_timer = NULL;
 
     // Close popup if still open
+    // Note: Don't set pendingScreen - popup is on top layer, main screen is still underneath
     if (tag_popup) {
         close_popup();
-        pendingScreen = SCREEN_ID_MAIN_SCREEN;
     }
 }
 
@@ -110,6 +111,7 @@ static void add_spool_click_handler(lv_event_t *e) {
     uint32_t color_rgba = nfc_get_tag_color_rgba();
     int label_weight = nfc_get_tag_spool_weight();
     const char *tag_type = nfc_get_tag_type();
+    const char *slicer_filament = nfc_get_tag_slicer_filament();
 
     // Get current weight from scale
     int weight_current = 0;
@@ -117,12 +119,12 @@ static void add_spool_click_handler(lv_event_t *e) {
         weight_current = (int)scale_get_weight();
     }
 
-    printf("[ui_nfc_card] Adding spool: tag=%s vendor=%s material=%s subtype=%s\n",
-           tag_id, vendor, material, subtype ? subtype : "");
+    printf("[ui_nfc_card] Adding spool: tag=%s vendor=%s material=%s subtype=%s slicer=%s\n",
+           tag_id, vendor, material, subtype ? subtype : "", slicer_filament ? slicer_filament : "");
 
     // Add to inventory
     bool success = spool_add_to_inventory(tag_id, vendor, material, subtype, color_name, color_rgba,
-                                          label_weight, weight_current, "nfc_scan", tag_type);
+                                          label_weight, weight_current, "nfc_scan", tag_type, slicer_filament);
 
     if (success) {
         // Show success feedback - change button to green checkmark
@@ -317,6 +319,18 @@ static void create_tag_popup(void) {
     static char stored_tag_id[32];
     strncpy(stored_tag_id, (const char*)uid_str, sizeof(stored_tag_id) - 1);
 
+    // Check if this is an unknown tag (needs manual configuration)
+    bool is_unknown_tag = (vendor && strcmp(vendor, "Unknown") == 0);
+
+    // Show hint for unknown tags
+    if (is_unknown_tag && !tag_in_inventory) {
+        lv_obj_t *hint_label = lv_label_create(card);
+        lv_label_set_text(hint_label, LV_SYMBOL_WARNING " Add to inventory, then edit details in web UI");
+        lv_obj_set_style_text_font(hint_label, &lv_font_montserrat_12, LV_PART_MAIN);
+        lv_obj_set_style_text_color(hint_label, lv_color_hex(0xFFAA00), LV_PART_MAIN);
+        lv_obj_align(hint_label, LV_ALIGN_BOTTOM_MID, 0, -55);
+    }
+
     // Buttons container - use percentage width to fit within card padding
     lv_obj_t *btn_container = lv_obj_create(card);
     lv_obj_set_size(btn_container, LV_PCT(100), 50);
@@ -465,7 +479,11 @@ void ui_nfc_card_update(void) {
 
 // Show popup externally (e.g., from status bar click)
 void ui_nfc_card_show_popup(void) {
-    if (staging_is_active() && !tag_popup) {
+    bool staging = staging_is_active();
+    printf("[ui_nfc_card] show_popup called: staging=%d, tag_popup=%p, dismissed=%d\n",
+           staging, (void*)tag_popup, popup_dismissed_for_current_tag);
+
+    if (staging && !tag_popup) {
         printf("[ui_nfc_card] Showing popup from external request\n");
         popup_dismissed_for_current_tag = false;
         create_tag_popup();

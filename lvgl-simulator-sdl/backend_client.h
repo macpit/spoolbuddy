@@ -207,11 +207,12 @@ bool spool_exists_by_tag(const char *tag_id);
 //   weight_current: Current weight from scale in grams
 //   data_origin: Origin of data (e.g., "nfc_scan", "manual")
 //   tag_type: NFC tag type (e.g., "bambu", "generic")
+//   slicer_filament: Slicer filament profile ID (e.g., "GFL99")
 // Returns true on success, false on failure
 bool spool_add_to_inventory(const char *tag_id, const char *vendor, const char *material,
                             const char *subtype, const char *color_name, uint32_t color_rgba,
                             int label_weight, int weight_current, const char *data_origin,
-                            const char *tag_type);
+                            const char *tag_type, const char *slicer_filament);
 
 // =============================================================================
 // OTA functions (mocked in simulator - implemented in sim_mocks.c)
@@ -237,6 +238,11 @@ void staging_clear(void);  // Clear staging via backend API
 const char *nfc_get_tag_vendor(void);
 const char *nfc_get_tag_material(void);
 const char *nfc_get_tag_material_subtype(void);
+const char *nfc_get_tag_color_name(void);
+uint32_t nfc_get_tag_color_rgba(void);
+int nfc_get_tag_spool_weight(void);
+const char *nfc_get_tag_type(void);
+const char *nfc_get_tag_slicer_filament(void);
 
 #ifdef __cplusplus
 }

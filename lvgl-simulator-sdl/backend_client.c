@@ -36,6 +36,7 @@ static char g_tag_color_name[32] = "";
 static uint32_t g_tag_color_rgba = 0;
 static int g_tag_spool_weight = 0;
 static char g_tag_type[32] = "";
+static char g_tag_slicer_filament[32] = "";
 
 // Staging state - separate from raw NFC tag detection
 // UI should use staging_is_active() for popup control
@@ -426,6 +427,9 @@ int backend_poll(void) {
 
             item = cJSON_GetObjectItem(tag_data, "tag_type");
             if (item && item->valuestring) strncpy(g_tag_type, item->valuestring, sizeof(g_tag_type) - 1);
+
+            item = cJSON_GetObjectItem(tag_data, "slicer_filament");
+            if (item && item->valuestring) strncpy(g_tag_slicer_filament, item->valuestring, sizeof(g_tag_slicer_filament) - 1);
         } else {
             // Staging expired or no tag - clear simulator NFC state
             if (g_nfc_tag_present) {
@@ -438,6 +442,7 @@ int backend_poll(void) {
                 g_tag_color_rgba = 0;
                 g_tag_spool_weight = 0;
                 g_tag_type[0] = '\0';
+                g_tag_slicer_filament[0] = '\0';
             }
         }
 
@@ -743,7 +748,7 @@ bool spool_exists_by_tag(const char *tag_id) {
 bool spool_add_to_inventory(const char *tag_id, const char *vendor, const char *material,
                             const char *subtype, const char *color_name, uint32_t color_rgba,
                             int label_weight, int weight_current, const char *data_origin,
-                            const char *tag_type) {
+                            const char *tag_type, const char *slicer_filament) {
     if (!g_curl) {
         printf("[backend] spool_add_to_inventory: curl not initialized\n");
         return false;
@@ -772,6 +777,7 @@ bool spool_add_to_inventory(const char *tag_id, const char *vendor, const char *
     }
     if (data_origin && data_origin[0]) cJSON_AddStringToObject(json, "data_origin", data_origin);
     if (tag_type && tag_type[0]) cJSON_AddStringToObject(json, "tag_type", tag_type);
+    if (slicer_filament && slicer_filament[0]) cJSON_AddStringToObject(json, "slicer_filament", slicer_filament);
 
     char *body = cJSON_PrintUnformatted(json);
     cJSON_Delete(json);
@@ -961,6 +967,7 @@ void sim_set_nfc_tag_present(bool present) {
         g_tag_color_rgba = 0;
         g_tag_spool_weight = 0;
         g_tag_type[0] = '\0';
+        g_tag_slicer_filament[0] = '\0';
     }
 }
 
@@ -1000,6 +1007,10 @@ int nfc_get_tag_spool_weight(void) {
 
 const char* nfc_get_tag_type(void) {
     return g_nfc_tag_present ? g_tag_type : "";
+}
+
+const char* nfc_get_tag_slicer_filament(void) {
+    return g_nfc_tag_present ? g_tag_slicer_filament : "";
 }
 
 // =============================================================================

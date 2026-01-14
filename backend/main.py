@@ -1,10 +1,12 @@
 import asyncio
+import csv
 import json
 import socket
 import logging
 import time
 from contextlib import asynccontextmanager
-from typing import Set, Optional, Dict
+from pathlib import Path
+from typing import Set, Optional, Dict, Tuple
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from zeroconf.asyncio import AsyncZeroconf
@@ -28,6 +30,69 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+# === Bambu Color Name Lookup ===
+# Maps (material_id, color_rgba_hex) -> color_name from bambu-color-names.csv
+_bambu_color_map: Dict[Tuple[str, str], str] = {}
+
+
+def _load_bambu_color_map():
+    """Load Bambu color name mappings from CSV file."""
+    global _bambu_color_map
+    csv_path = Path(__file__).parent.parent / "spoolease_sources" / "core" / "data" / "bambu-color-names.csv"
+    if not csv_path.exists():
+        logger.warning(f"Bambu color names CSV not found at {csv_path}")
+        return
+    try:
+        with open(csv_path, "r") as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if len(row) >= 3:
+                    material_id = row[0].strip()
+                    color_rgba = row[1].strip().upper()
+                    color_name = row[2].strip()
+                    # Handle dual-color entries (e.g., "FFFFFFFF/9CDBD9FF")
+                    for rgba in color_rgba.split("/"):
+                        _bambu_color_map[(material_id, rgba)] = color_name
+        logger.info(f"Loaded {len(_bambu_color_map)} Bambu color mappings")
+    except Exception as e:
+        logger.warning(f"Failed to load Bambu color names: {e}")
+
+
+def lookup_bambu_color_name(material_id: str, color_rgba: int) -> Optional[str]:
+    """Look up Bambu color name from material_id and RGBA color value.
+
+    Args:
+        material_id: Material ID like "GFA00", or slicer filament name like "Bambu PLA Basic"
+        color_rgba: RGBA color value as integer (e.g., 0xA6A9AAFF)
+
+    Returns:
+        Color name like "Silver" if found, None otherwise
+    """
+    if not material_id or color_rgba == 0:
+        return None
+
+    # Convert RGBA integer to hex string (uppercase, 8 chars)
+    rgba_hex = f"{color_rgba:08X}"
+
+    # Try direct lookup
+    result = _bambu_color_map.get((material_id, rgba_hex))
+    if result:
+        return result
+
+    # material_id might be a full name like "Bambu PLA Basic" - need to check all GFAxx entries
+    # This is a fallback for when we don't have the original material_id code
+    if material_id.startswith("Bambu "):
+        # Try all entries that match this color
+        for (mat_id, rgba), name in _bambu_color_map.items():
+            if rgba == rgba_hex:
+                return name
+
+    return None
+
+
+# Load color map at module import
+_load_bambu_color_map()
 
 # Global state
 printer_manager = PrinterManager()
@@ -56,7 +121,7 @@ _device_weight_stable: bool = False
 # When a tag is detected, it goes to "staging" for 30 seconds.
 # This allows the user to interact with the tag even if NFC reads are flaky.
 # Staging only clears on: timeout, different tag detected, or manual clear.
-STAGING_TIMEOUT = 300  # seconds (5 minutes - longer due to flaky NFC detection)
+STAGING_TIMEOUT = 30  # seconds
 _staged_tag_id: Optional[str] = None
 _staged_tag_data: Optional[Dict] = None
 _staged_tag_timestamp: float = 0  # time.time() when staged
@@ -108,7 +173,8 @@ def get_staging_remaining() -> float:
 def stage_tag(tag_id: str, tag_data: Dict) -> bool:
     """
     Add tag to staging. Returns True if this is a new/different tag.
-    Same tag resets the 30s timer (keeps staging alive during flaky reads).
+    Same tag does NOT reset timer - countdown continues while tag is on reader.
+    Only placing a NEW tag resets the timer.
     Returns False without staging if tag is blocked.
     """
     global _staged_tag_id, _staged_tag_data, _staged_tag_timestamp, _tag_data_cache
@@ -129,7 +195,11 @@ def stage_tag(tag_id: str, tag_data: Dict) -> bool:
 
     _staged_tag_id = tag_id
     _staged_tag_data = tag_data
-    _staged_tag_timestamp = time.time()  # Always reset timer
+
+    # Only reset timer for NEW tags, not for same tag re-detection
+    # This allows the countdown to actually progress while tag is on reader
+    if is_new_tag:
+        _staged_tag_timestamp = time.time()
 
     # Cache the decoded data for future re-staging
     if tag_data and tag_data.get('vendor'):
@@ -726,14 +796,26 @@ async def handle_tag_detected(websocket: WebSocket, message: dict):
             _device_tag_data["color_name"] = d.color_name or ""
             _device_tag_data["color_rgba"] = int(d.color_code + "FF", 16) if d.color_code and len(d.color_code) == 6 else 0
             _device_tag_data["spool_weight"] = d.weight_label or 0
+            _device_tag_data["slicer_filament"] = d.slicer_filament_code or ""
         elif result.bambulab_data:
             d = result.bambulab_data
             _device_tag_data["vendor"] = "Bambu"
             _device_tag_data["material"] = d.tray_type or ""
             _device_tag_data["subtype"] = d.tray_sub_brands or ""
-            _device_tag_data["color_name"] = ""
-            _device_tag_data["color_rgba"] = d.tray_color if d.tray_color else 0
+            color_rgba = d.tray_color if d.tray_color else 0
+            _device_tag_data["color_rgba"] = color_rgba
             _device_tag_data["spool_weight"] = d.spool_weight or 0
+            # Map material_id to human-readable slicer profile name
+            from tags.bambulab import BAMBU_MATERIALS
+            material_id = d.material_id or ""
+            if material_id in BAMBU_MATERIALS:
+                slicer_name, _ = BAMBU_MATERIALS[material_id]
+            else:
+                slicer_name = material_id  # Fallback to code if not found
+            _device_tag_data["slicer_filament"] = slicer_name
+            # Look up color name from Bambu color database
+            color_name = lookup_bambu_color_name(material_id, color_rgba)
+            _device_tag_data["color_name"] = color_name or ""
         elif result.openprinttag_data:
             d = result.openprinttag_data
             _device_tag_data["vendor"] = d.brand or ""
@@ -743,6 +825,10 @@ async def handle_tag_detected(websocket: WebSocket, message: dict):
             color_hex = d.color_hex or ""
             _device_tag_data["color_rgba"] = int(color_hex + "FF", 16) if len(color_hex) == 6 else 0
             _device_tag_data["spool_weight"] = 0
+            _device_tag_data["slicer_filament"] = ""  # OpenPrintTag doesn't have slicer info
+
+        # Stage the decoded tag data immediately (ensures slicer_filament is included)
+        stage_tag(uid_hex, _device_tag_data)
 
         # Send result back to all clients
         response = {
@@ -803,11 +889,55 @@ async def handle_device_state(message: dict):
     # Flaky reads (no tag_id) are ignored - staging handles persistence
 
     if tag_id and provided_tag_data and provided_tag_data.get("vendor"):
-        # Tag with decoded data - stage it
+        # Tag with decoded data - enrich with slicer filament name if missing
+        if "slicer_filament" not in provided_tag_data or not provided_tag_data.get("slicer_filament"):
+            vendor = provided_tag_data.get("vendor", "")
+            material = provided_tag_data.get("material", "")
+            subtype = provided_tag_data.get("subtype", "")
+
+            # For Bambu tags, combine vendor + material + subtype
+            if vendor == "Bambu" and material:
+                if subtype:
+                    provided_tag_data["slicer_filament"] = f"Bambu {material} {subtype}"
+                else:
+                    provided_tag_data["slicer_filament"] = f"Bambu {material}"
+            elif material:
+                # Generic filament - use material type
+                provided_tag_data["slicer_filament"] = f"Generic {material}"
+
+        # Look up color name from Bambu color database
+        color_name = provided_tag_data.get("color_name", "")
+        if not color_name or color_name.startswith("#"):
+            # No color name or it's a hex code - try to look up from CSV
+            material_id = provided_tag_data.get("slicer_filament", "")  # May be code like "GFA00" or name
+            color_rgba = provided_tag_data.get("color_rgba", 0)
+            looked_up_name = lookup_bambu_color_name(material_id, color_rgba)
+            if looked_up_name:
+                provided_tag_data["color_name"] = looked_up_name
+                logger.debug(f"Looked up color name: {looked_up_name} for {material_id}/{color_rgba:08X}")
+            else:
+                provided_tag_data["color_name"] = ""
+        # Stage the enriched data
         is_new = stage_tag(tag_id, provided_tag_data)
         if is_new:
             state_changed = True
             # Broadcast that a new tag was staged
+            await broadcast_message({
+                "type": "tag_staged",
+                "tag_id": tag_id,
+                "tag_data": provided_tag_data,
+                "timeout": STAGING_TIMEOUT,
+            })
+    elif tag_id and provided_tag_data and not provided_tag_data.get("vendor"):
+        # Unknown tag type - has tag_data but no decoded vendor/material
+        # Still stage it so user can see it and potentially configure manually
+        tag_type = provided_tag_data.get("tag_type", "Unknown")
+        provided_tag_data["vendor"] = "Unknown"
+        provided_tag_data["material"] = tag_type
+        logger.info(f"Staging unknown tag: {tag_id} (type: {tag_type})")
+        is_new = stage_tag(tag_id, provided_tag_data)
+        if is_new:
+            state_changed = True
             await broadcast_message({
                 "type": "tag_staged",
                 "tag_id": tag_id,
@@ -845,6 +975,28 @@ async def handle_device_state(message: dict):
                         "tag_data": tag_data,
                         "timeout": STAGING_TIMEOUT,
                     })
+            else:
+                # Unknown tag not in database - stage as "Unknown" so user can see it
+                logger.info(f"Staging unknown tag (not in database): {tag_id}")
+                tag_data = {
+                    "uid": tag_id,
+                    "tag_type": "Unknown",
+                    "vendor": "Unknown",
+                    "material": "Unknown",
+                    "subtype": "",
+                    "color_name": "",
+                    "color_rgba": 0x888888FF,
+                    "spool_weight": 0,
+                }
+                is_new = stage_tag(tag_id, tag_data)
+                if is_new:
+                    state_changed = True
+                    await broadcast_message({
+                        "type": "tag_staged",
+                        "tag_id": tag_id,
+                        "tag_data": tag_data,
+                        "timeout": STAGING_TIMEOUT,
+                    })
     # else: no tag_id - ignore, let staging timeout naturally
 
     # Keep legacy _device_tag_data in sync with staging for backwards compat
@@ -863,34 +1015,30 @@ async def _lookup_tag_in_database(tag_id: str) -> Optional[Dict]:
     """Look up tag in spool database, return tag_data dict or None."""
     try:
         db = await get_db()
-        spools = await db.list_spools()
-        tag_id_normalized = tag_id.replace(":", "").upper()
-
-        for spool in spools:
-            spool_tag = spool.tag_id if hasattr(spool, 'tag_id') else spool.get('tag_id', '')
-            if spool_tag:
-                if spool_tag.replace(":", "").upper() == tag_id_normalized:
-                    spool_dict = spool.model_dump() if hasattr(spool, 'model_dump') else dict(spool)
-                    tag_data = {
-                        "uid": tag_id,
-                        "tag_type": spool_dict.get("tag_type", "database"),
-                        "vendor": spool_dict.get("brand", ""),
-                        "material": spool_dict.get("material", ""),
-                        "subtype": spool_dict.get("subtype", ""),
-                        "color_name": spool_dict.get("color_name", ""),
-                        "spool_weight": spool_dict.get("label_weight", 0),
-                    }
-                    # Convert RGBA hex to int
-                    rgba_str = spool_dict.get("rgba", "")
-                    if rgba_str and len(rgba_str) >= 6:
-                        try:
-                            if len(rgba_str) == 6:
-                                rgba_str = rgba_str + "FF"
-                            tag_data["color_rgba"] = int(rgba_str, 16)
-                        except ValueError:
-                            tag_data["color_rgba"] = 0
-                    logger.info(f"Tag {tag_id} matched to spool: {spool_dict.get('material')} {spool_dict.get('color_name')}")
-                    return tag_data
+        # Use the dedicated method to look up by tag
+        spool = await db.get_spool_by_tag(tag_id)
+        if spool:
+            spool_dict = spool.model_dump() if hasattr(spool, 'model_dump') else dict(spool)
+            tag_data = {
+                "uid": tag_id,
+                "tag_type": spool_dict.get("tag_type", "database"),
+                "vendor": spool_dict.get("brand", ""),
+                "material": spool_dict.get("material", ""),
+                "subtype": spool_dict.get("subtype", ""),
+                "color_name": spool_dict.get("color_name", ""),
+                "spool_weight": spool_dict.get("label_weight", 0),
+            }
+            # Convert RGBA hex to int
+            rgba_str = spool_dict.get("rgba", "")
+            if rgba_str and len(rgba_str) >= 6:
+                try:
+                    if len(rgba_str) == 6:
+                        rgba_str = rgba_str + "FF"
+                    tag_data["color_rgba"] = int(rgba_str, 16)
+                except ValueError:
+                    tag_data["color_rgba"] = 0
+            logger.info(f"Tag {tag_id} matched to spool: {spool_dict.get('material')} {spool_dict.get('color_name')}")
+            return tag_data
     except Exception as e:
         logger.warning(f"Error looking up spool for tag {tag_id}: {e}")
 
