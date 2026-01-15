@@ -31,6 +31,13 @@ extern int32_t scale_calibrate(float known_weight);
 // Screen Objects (stored for updates)
 // =============================================================================
 
+// Splash Screen objects
+static lv_obj_t *splash_screen = NULL;
+static lv_obj_t *splash_logo = NULL;
+static lv_obj_t *splash_spinner = NULL;
+static lv_timer_t *splash_timer = NULL;
+static int splash_stage = 0;  // Animation stage
+
 // NFC Screen objects
 static lv_obj_t *nfc_screen = NULL;
 static lv_obj_t *nfc_screen_top_bar_icon_back = NULL;
@@ -75,6 +82,121 @@ static void scale_cal_timer_cb(lv_timer_t *timer);
 #define COLOR_ACCENT_YELLOW 0xffff00
 #define COLOR_ACCENT_RED    0xff4444
 #define COLOR_ACCENT_BLUE   0x0088ff
+
+// =============================================================================
+// Splash Screen
+// =============================================================================
+
+// Animation callback for logo fade-in and scale
+static void splash_logo_anim_cb(void *var, int32_t value) {
+    lv_obj_t *obj = (lv_obj_t *)var;
+    lv_obj_set_style_opa(obj, value, LV_PART_MAIN);
+}
+
+static void splash_logo_scale_cb(void *var, int32_t value) {
+    lv_obj_t *obj = (lv_obj_t *)var;
+    lv_image_set_scale(obj, value);
+}
+
+// Timer callback for splash screen progression
+static void splash_timer_cb(lv_timer_t *timer) {
+    splash_stage++;
+
+    if (splash_stage == 1) {
+        // Stage 1: Fade in logo with scale animation
+        if (splash_logo) {
+            lv_anim_t anim_fade;
+            lv_anim_init(&anim_fade);
+            lv_anim_set_var(&anim_fade, splash_logo);
+            lv_anim_set_values(&anim_fade, 0, 255);
+            lv_anim_set_duration(&anim_fade, 800);
+            lv_anim_set_exec_cb(&anim_fade, splash_logo_anim_cb);
+            lv_anim_set_path_cb(&anim_fade, lv_anim_path_ease_out);
+            lv_anim_start(&anim_fade);
+
+            // Scale animation (zoom in slightly)
+            lv_anim_t anim_scale;
+            lv_anim_init(&anim_scale);
+            lv_anim_set_var(&anim_scale, splash_logo);
+            lv_anim_set_values(&anim_scale, 200, 280);  // 78% to 110% (256 = 100%)
+            lv_anim_set_duration(&anim_scale, 800);
+            lv_anim_set_exec_cb(&anim_scale, splash_logo_scale_cb);
+            lv_anim_set_path_cb(&anim_scale, lv_anim_path_ease_out);
+            lv_anim_start(&anim_scale);
+        }
+    } else if (splash_stage == 2) {
+        // Stage 2: Fade in spinner
+        if (splash_spinner) {
+            lv_anim_t anim;
+            lv_anim_init(&anim);
+            lv_anim_set_var(&anim, splash_spinner);
+            lv_anim_set_values(&anim, 0, 255);
+            lv_anim_set_duration(&anim, 500);
+            lv_anim_set_exec_cb(&anim, splash_logo_anim_cb);
+            lv_anim_start(&anim);
+        }
+    } else if (splash_stage >= 5) {
+        // Stage 5+: Transition to main screen
+        if (splash_timer) {
+            lv_timer_delete(splash_timer);
+            splash_timer = NULL;
+        }
+        pendingScreen = SCREEN_ID_MAIN_SCREEN;
+    }
+}
+
+void create_splash_screen(void) {
+    if (splash_screen) return;
+
+    splash_stage = 0;
+
+    // Create screen with pure black background
+    splash_screen = lv_obj_create(NULL);
+    lv_obj_set_size(splash_screen, 800, 480);
+    lv_obj_set_style_bg_color(splash_screen, lv_color_hex(0x000000), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(splash_screen, 255, LV_PART_MAIN);
+    lv_obj_set_style_border_width(splash_screen, 0, LV_PART_MAIN);
+    lv_obj_clear_flag(splash_screen, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Logo (starts invisible and small)
+    splash_logo = lv_image_create(splash_screen);
+    lv_image_set_src(splash_logo, &img_spoolbuddy_logo_dark);
+    lv_obj_align(splash_logo, LV_ALIGN_CENTER, 0, -30);
+    lv_image_set_scale(splash_logo, 200);  // Start at 78%
+    lv_obj_set_style_opa(splash_logo, 0, LV_PART_MAIN);  // Start invisible
+
+    // Spinner (starts invisible, below logo)
+    splash_spinner = lv_spinner_create(splash_screen);
+    lv_obj_set_size(splash_spinner, 50, 50);
+    lv_obj_align(splash_spinner, LV_ALIGN_CENTER, 0, 100);
+    lv_spinner_set_anim_params(splash_spinner, 1200, 200);
+    lv_obj_set_style_arc_color(splash_spinner, lv_color_hex(COLOR_ACCENT_GREEN), LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(splash_spinner, lv_color_hex(0x333333), LV_PART_MAIN);
+    lv_obj_set_style_arc_width(splash_spinner, 6, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_width(splash_spinner, 6, LV_PART_MAIN);
+    lv_obj_set_style_opa(splash_spinner, 0, LV_PART_MAIN);  // Start invisible
+
+    // Start animation timer (300ms per stage)
+    splash_timer = lv_timer_create(splash_timer_cb, 300, NULL);
+}
+
+lv_obj_t *get_splash_screen(void) {
+    return splash_screen;
+}
+
+void cleanup_splash_screen(void) {
+    if (splash_timer) {
+        lv_timer_delete(splash_timer);
+        splash_timer = NULL;
+    }
+    if (splash_screen) {
+        lv_obj_delete(splash_screen);
+        splash_screen = NULL;
+        splash_logo = NULL;
+        splash_spinner = NULL;
+    }
+    splash_stage = 0;
+}
 
 // =============================================================================
 // Helper: Create Standard Top Bar

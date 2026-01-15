@@ -156,6 +156,7 @@ extern int ota_start_update(void);
 #define SCREEN_ID_NFC_SCREEN 100
 #define SCREEN_ID_SCALE_SCREEN 101
 #define SCREEN_ID_SCALE_CALIBRATION_SCREEN 102
+#define SCREEN_ID_SPLASH_SCREEN 103
 
 // =============================================================================
 // Shared Global Variables (defined in ui_core.c)
@@ -242,11 +243,14 @@ void update_display_ui(void);
 
 void create_nfc_screen(void);
 void create_scale_calibration_screen(void);
+void create_splash_screen(void);
 lv_obj_t *get_nfc_screen(void);
 lv_obj_t *get_scale_calibration_screen(void);
+lv_obj_t *get_splash_screen(void);
 void update_nfc_screen(void);
 void update_scale_calibration_screen(void);
 void cleanup_hardware_screens(void);
+void cleanup_splash_screen(void);
 
 // =============================================================================
 // Module Functions - ui_backend.c

@@ -117,6 +117,7 @@ void loadScreen(enum ScreensEnum screenId) {
         case SCREEN_ID_SETTINGS_UPDATE_SCREEN: screen = objects.settings_update_screen; break;
         case SCREEN_ID_NFC_SCREEN: screen = get_nfc_screen(); break;
         case SCREEN_ID_SCALE_CALIBRATION_SCREEN: screen = get_scale_calibration_screen(); break;
+        case SCREEN_ID_SPLASH_SCREEN: screen = get_splash_screen(); break;
         default: screen = getLvglObjectFromIndex(currentScreen); break;
     }
 
@@ -289,11 +290,9 @@ void ui_init() {
         lv_display_set_theme(dispp, theme);
     }
 
-    // Create main screen
-    create_screen_main_screen();
-    wire_main_buttons();
-    ui_nfc_card_init();
-    loadScreen(SCREEN_ID_MAIN_SCREEN);
+    // Show splash screen first
+    create_splash_screen();
+    loadScreen(SCREEN_ID_SPLASH_SCREEN);
 }
 
 static int tick_count = 0;
@@ -319,6 +318,9 @@ void ui_tick() {
             }
         }
 
+        // Track which screen we're leaving for splash cleanup
+        enum ScreensEnum leavingScreen = (enum ScreensEnum)(currentScreen + 1);
+
         // For programmatic screens, create and load BEFORE deleting old screens
         // This prevents LVGL from having an invalid active screen during transition
         if (screen == SCREEN_ID_NFC_SCREEN || screen == SCREEN_ID_SCALE_CALIBRATION_SCREEN) {
@@ -332,6 +334,10 @@ void ui_tick() {
             loadScreen(screen);
             // Now delete old EEZ screens (programmatic screens are protected in cleanup)
             delete_all_screens();
+            // Clean up splash if we were on it
+            if ((int)leavingScreen == SCREEN_ID_SPLASH_SCREEN) {
+                cleanup_splash_screen();
+            }
         } else {
             // Standard EEZ screen transition
             delete_all_screens();
@@ -389,6 +395,11 @@ void ui_tick() {
             }
 
             loadScreen(screen);
+
+            // Clean up splash screen AFTER loading new screen to avoid "active screen deleted" warning
+            if ((int)leavingScreen == SCREEN_ID_SPLASH_SCREEN) {
+                cleanup_splash_screen();
+            }
         }
 
         // Force immediate backend UI update for the new screen

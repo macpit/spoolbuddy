@@ -417,10 +417,11 @@ void update_wifi_ui_state(void) {
         }
     }
 
-    // Update Scan button state - only enabled when disconnected
+    // Update Scan button state - enabled when not connected/connecting
     if (objects.settings_wifi_screen_content_panel_button_scan_) {
         lv_obj_t *label = lv_obj_get_child(objects.settings_wifi_screen_content_panel_button_scan_, 0);
-        if (status.state == 1) {  // Disconnected - enable scan with green button
+        // Enable scan when: Uninitialized (0), Disconnected (1), or Error (4)
+        if (status.state == 0 || status.state == 1 || status.state == 4) {
             lv_obj_remove_state(objects.settings_wifi_screen_content_panel_button_scan_, LV_STATE_DISABLED);
             lv_obj_set_style_bg_color(objects.settings_wifi_screen_content_panel_button_scan_, lv_color_hex(0xff00ff00), LV_PART_MAIN);
             if (label) lv_obj_set_style_text_color(label, lv_color_hex(0xff000000), LV_PART_MAIN);
