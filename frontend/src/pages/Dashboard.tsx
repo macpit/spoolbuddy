@@ -40,7 +40,7 @@ export function Dashboard() {
   const [spools, setSpools] = useState<Spool[]>([]);
   const [printers, setPrinters] = useState<Printer[]>([]);
   const [loading, setLoading] = useState(true);
-  const { deviceConnected, deviceUpdateAvailable, currentWeight, weightStable, currentTagId, printerStatuses } = useWebSocket();
+  const { deviceConnected, deviceUpdateAvailable, currentWeight, weightStable, currentTagId, printerStatuses, printerStates } = useWebSocket();
   const [cloudStatus, setCloudStatus] = useState<CloudAuthStatus | null>(null);
   const [cloudBannerDismissed, setCloudBannerDismissed] = useState(() => {
     return localStorage.getItem('spoolbuddy-cloud-banner-dismissed') === 'true';
@@ -268,6 +268,60 @@ export function Dashboard() {
     return printerStatuses.get(printer.serial) ?? printer.connected ?? false;
   };
 
+  // Get printer state info for display
+  const getPrinterStateInfo = (printer: Printer) => {
+    const connected = isPrinterConnected(printer);
+    if (!connected) {
+      return { status: "Offline", color: "text-[var(--text-muted)]", bgColor: "bg-[var(--bg-secondary)]" };
+    }
+
+    const state = printerStates.get(printer.serial);
+    if (!state || !state.gcode_state) {
+      return { status: "Connected", color: "text-green-500", bgColor: "bg-green-500/20" };
+    }
+
+    const gcodeState = state.gcode_state.toUpperCase();
+    switch (gcodeState) {
+      case "RUNNING":
+        return {
+          status: "Printing",
+          color: "text-blue-400",
+          bgColor: "bg-blue-500/20",
+          progress: state.print_progress,
+          jobName: state.subtask_name,
+          remainingTime: state.mc_remaining_time
+        };
+      case "PAUSE":
+        return {
+          status: "Paused",
+          color: "text-yellow-500",
+          bgColor: "bg-yellow-500/20",
+          progress: state.print_progress,
+          jobName: state.subtask_name
+        };
+      case "FINISH":
+        return { status: "Finished", color: "text-green-500", bgColor: "bg-green-500/20" };
+      case "FAILED":
+        return { status: "Failed", color: "text-red-500", bgColor: "bg-red-500/20" };
+      case "PREPARE":
+        return { status: "Preparing", color: "text-cyan-400", bgColor: "bg-cyan-500/20" };
+      case "SLICING":
+        return { status: "Slicing", color: "text-purple-400", bgColor: "bg-purple-500/20" };
+      case "IDLE":
+      default:
+        return { status: "Idle", color: "text-green-500", bgColor: "bg-green-500/20" };
+    }
+  };
+
+  // Format remaining time
+  const formatRemainingTime = (minutes: number | null | undefined): string | null => {
+    if (minutes === null || minutes === undefined || minutes <= 0) return null;
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  };
+
   // Calculate stats
   const totalSpools = spools.length;
   const materials = new Set(spools.map((s) => s.material)).size;
@@ -390,23 +444,57 @@ export function Dashboard() {
         <div class="card p-6">
           <h2 class="text-lg font-semibold text-[var(--text-primary)] mb-4">Printers</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {printers.map((printer) => (
-              <div key={printer.serial} class="flex items-center justify-between p-3 bg-[var(--bg-tertiary)] rounded-lg">
-                <div>
-                  <p class="font-medium text-[var(--text-primary)]">{printer.name || printer.serial}</p>
-                  <p class="text-sm text-[var(--text-secondary)]">{printer.model}</p>
-                </div>
-                <span
-                  class={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    isPrinterConnected(printer)
-                      ? "bg-green-500/20 text-green-500"
-                      : "bg-[var(--bg-secondary)] text-[var(--text-muted)]"
-                  }`}
+            {printers.map((printer) => {
+              const stateInfo = getPrinterStateInfo(printer);
+              const hasProgress = stateInfo.progress !== undefined && stateInfo.progress !== null;
+              const remainingTimeStr = formatRemainingTime(stateInfo.remainingTime);
+
+              return (
+                <Link
+                  key={printer.serial}
+                  href="/printers"
+                  class="block p-3 bg-[var(--bg-tertiary)] rounded-lg hover:bg-[var(--border-color)] transition-colors"
                 >
-                  {isPrinterConnected(printer) ? "Connected" : "Offline"}
-                </span>
-              </div>
-            ))}
+                  {/* Header row: name/model and status badge */}
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="min-w-0 flex-1">
+                      <p class="font-medium text-[var(--text-primary)] truncate">{printer.name || printer.serial}</p>
+                      <p class="text-sm text-[var(--text-secondary)]">{printer.model}</p>
+                    </div>
+                    <span
+                      class={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium ${stateInfo.bgColor} ${stateInfo.color}`}
+                    >
+                      {stateInfo.status}
+                    </span>
+                  </div>
+
+                  {/* Print job info when printing or paused */}
+                  {stateInfo.jobName && (
+                    <p class="mt-2 text-xs text-[var(--text-muted)] truncate" title={stateInfo.jobName}>
+                      {stateInfo.jobName}
+                    </p>
+                  )}
+
+                  {/* Progress bar when printing or paused */}
+                  {hasProgress && (
+                    <div class="mt-2">
+                      <div class="flex justify-between text-xs text-[var(--text-muted)] mb-1">
+                        <span>{stateInfo.progress}%</span>
+                        {remainingTimeStr && <span>{remainingTimeStr} left</span>}
+                      </div>
+                      <div class="h-1.5 bg-[var(--bg-secondary)] rounded-full overflow-hidden">
+                        <div
+                          class={`h-full rounded-full transition-all ${
+                            stateInfo.status === "Paused" ? "bg-yellow-500" : "bg-blue-500"
+                          }`}
+                          style={{ width: `${stateInfo.progress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </Link>
+              );
+            })}
           </div>
         </div>
       )}

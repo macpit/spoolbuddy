@@ -697,11 +697,11 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, onDelete, on
       title={isEditing ? 'Edit Spool' : 'Add New Spool'}
       size="lg"
       footer={
-        <div class="flex justify-between w-full">
-          <div class="flex gap-2">
+        <div class="flex items-center justify-between w-full gap-3">
+          <div class="flex items-center gap-2">
             {isEditing && onDelete && editSpool && (
               <button
-                class="btn btn-danger"
+                class="btn btn-danger-outline"
                 onClick={() => {
                   onDelete(editSpool)
                   onClose()
@@ -752,12 +752,12 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, onDelete, on
               </button>
             )}
           </div>
-          <div class="flex gap-2">
-            <button class="btn" onClick={onClose} disabled={isSubmitting}>
+          <div class="flex items-center gap-2">
+            <button class="btn btn-ghost" onClick={onClose} disabled={isSubmitting}>
               Cancel
             </button>
             <button class="btn btn-primary" onClick={handleSubmit} disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : isEditing ? 'Save Changes' : 'Add Spool'}
+              {isSubmitting ? 'Saving...' : isEditing ? 'Save' : 'Add Spool'}
             </button>
           </div>
         </div>
@@ -788,10 +788,10 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, onDelete, on
 
       {/* Tab Content */}
       {activeTab === 'filament' ? (
-        <div class="space-y-5">
+        <div class="space-y-6">
           {/* === FILAMENT SECTION === */}
-          <div class="space-y-3">
-            <h3 class="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">Filament</h3>
+          <div class="space-y-4">
+            <h3 class="section-header">Filament</h3>
 
             {/* Slicer Preset - REQUIRED */}
             <div>
@@ -924,8 +924,8 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, onDelete, on
           </div>
 
           {/* === COLOR SECTION === */}
-          <div class="space-y-3">
-            <h3 class="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">Color</h3>
+          <div class="space-y-4">
+            <h3 class="section-header">Color</h3>
 
             {/* Color Preview Banner */}
             <div
@@ -1020,8 +1020,8 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, onDelete, on
           </div>
 
           {/* === ADDITIONAL SECTION === */}
-          <div class="space-y-3">
-            <h3 class="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">Additional</h3>
+          <div class="space-y-4">
+            <h3 class="section-header">Additional</h3>
 
             {/* Location */}
             <div>
