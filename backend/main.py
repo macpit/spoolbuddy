@@ -18,6 +18,7 @@ from config import settings
 from db import get_db
 from mqtt import PrinterManager
 from api import spools_router, printers_router, updates_router, firmware_router, tags_router, device_router, serial_router, discovery_router, catalog_router
+from api.settings import router as settings_router
 from api.printers import set_printer_manager
 from api.cloud import router as cloud_router
 from models import PrinterState
@@ -34,6 +35,11 @@ logger = logging.getLogger(__name__)
 # === Bambu Color Name Lookup ===
 # Maps (material_id, color_rgba_hex) -> color_name from bambu-color-names.csv
 _bambu_color_map: Dict[Tuple[str, str], str] = {}
+
+# === AMS Sensor Recording ===
+# Track last recording time per (printer_serial, ams_id) to rate-limit recordings
+_ams_sensor_last_record: Dict[Tuple[str, int], float] = {}
+AMS_SENSOR_RECORD_INTERVAL = 300  # Record every 5 minutes (300 seconds)
 
 
 def _load_bambu_color_map():
@@ -407,6 +413,39 @@ async def on_usage_logged(serial: str, print_name: str, tray_usage: dict):
     })
 
 
+async def _record_ams_sensors(serial: str, state: PrinterState):
+    """Record AMS sensor data (humidity/temperature) with rate limiting."""
+    global _ams_sensor_last_record
+    now = time.time()
+
+    for unit in state.ams_units:
+        ams_id = unit.id
+        key = (serial, ams_id)
+
+        # Check if enough time has passed since last recording
+        last_record = _ams_sensor_last_record.get(key, 0)
+        if now - last_record < AMS_SENSOR_RECORD_INTERVAL:
+            continue
+
+        # Only record if we have humidity or temperature data
+        if unit.humidity is None and unit.temperature is None:
+            continue
+
+        try:
+            db = await get_db()
+            await db.record_ams_sensor(
+                printer_serial=serial,
+                ams_id=ams_id,
+                humidity=float(unit.humidity) if unit.humidity is not None else None,
+                humidity_raw=None,  # We don't have raw humidity separate from humidity
+                temperature=float(unit.temperature) if unit.temperature is not None else None,
+            )
+            _ams_sensor_last_record[key] = now
+            logger.debug(f"Recorded AMS sensor data for {serial} AMS {ams_id}: humidity={unit.humidity}, temp={unit.temperature}")
+        except Exception as e:
+            logger.warning(f"Failed to record AMS sensor data for {serial} AMS {ams_id}: {e}")
+
+
 def on_printer_state_update(serial: str, state: PrinterState):
     """Handle printer state update from MQTT."""
     global _previous_states
@@ -427,10 +466,13 @@ def on_printer_state_update(serial: str, state: PrinterState):
         "state": state.model_dump(),
     }
 
-    # Schedule broadcast in event loop
+    # Schedule broadcast and AMS sensor recording in event loop
     try:
         loop = asyncio.get_running_loop()
         loop.create_task(broadcast_message(message))
+        # Record AMS sensor data (rate-limited)
+        if state.ams_units:
+            loop.create_task(_record_ams_sensors(serial, state))
     except RuntimeError:
         pass  # No running loop
 
@@ -665,6 +707,7 @@ app.include_router(device_router, prefix="/api")
 app.include_router(serial_router, prefix="/api")
 app.include_router(discovery_router, prefix="/api")
 app.include_router(catalog_router, prefix="/api")
+app.include_router(settings_router, prefix="/api")
 
 
 @app.get("/api/time")

@@ -261,6 +261,35 @@ export interface CatalogEntryInput {
   weight: number;
 }
 
+// AMS History types
+export interface AMSHistoryPoint {
+  recorded_at: number;
+  humidity: number | null;
+  humidity_raw: number | null;
+  temperature: number | null;
+}
+
+export interface AMSHistoryResponse {
+  printer_serial: string;
+  ams_id: number;
+  data: AMSHistoryPoint[];
+  min_humidity: number | null;
+  max_humidity: number | null;
+  avg_humidity: number | null;
+  min_temperature: number | null;
+  max_temperature: number | null;
+  avg_temperature: number | null;
+}
+
+// AMS Thresholds
+export interface AMSThresholds {
+  humidity_good: number;
+  humidity_fair: number;
+  temp_good: number;
+  temp_fair: number;
+  history_retention_days: number;
+}
+
 class ApiClient {
   private async request<T>(
     path: string,
@@ -679,6 +708,23 @@ class ApiClient {
   async resetSpoolCatalog(): Promise<void> {
     return this.request<void>("/catalog/reset", {
       method: "POST",
+    });
+  }
+
+  // AMS History API
+  async getAMSHistory(printerSerial: string, amsId: number, hours: number = 24): Promise<AMSHistoryResponse> {
+    return this.request<AMSHistoryResponse>(`/printers/${printerSerial}/ams/${amsId}/history?hours=${hours}`);
+  }
+
+  // AMS Thresholds API
+  async getAMSThresholds(): Promise<AMSThresholds> {
+    return this.request<AMSThresholds>("/settings/ams/thresholds");
+  }
+
+  async setAMSThresholds(thresholds: AMSThresholds): Promise<AMSThresholds> {
+    return this.request<AMSThresholds>("/settings/ams/thresholds", {
+      method: "PUT",
+      body: JSON.stringify(thresholds),
     });
   }
 }

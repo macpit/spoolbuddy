@@ -806,3 +806,60 @@ async def get_printer_cover(serial: str):
         raise HTTPException(status_code=404, detail="No thumbnail found in 3MF file")
     finally:
         zf.close()
+
+
+class AMSHistoryResponse(BaseModel):
+    """Response for AMS sensor history."""
+    printer_serial: str
+    ams_id: int
+    data: list[dict]
+    min_humidity: float | None
+    max_humidity: float | None
+    avg_humidity: float | None
+    min_temperature: float | None
+    max_temperature: float | None
+    avg_temperature: float | None
+
+
+@router.get("/{serial}/ams/{ams_id}/history", response_model=AMSHistoryResponse)
+async def get_ams_history(serial: str, ams_id: int, hours: int = 24):
+    """Get AMS sensor history (humidity/temperature) for graphing.
+
+    Args:
+        serial: Printer serial number
+        ams_id: AMS unit ID (0-3 for regular AMS, 128-135 for AMS-HT)
+        hours: Time range in hours (1-168, default 24)
+
+    Returns:
+        AMSHistoryResponse with data points and statistics
+    """
+    # Validate hours range
+    if hours < 1:
+        hours = 1
+    if hours > 168:  # Max 7 days
+        hours = 168
+
+    db = await get_db()
+
+    # Verify printer exists
+    printer = await db.get_printer(serial)
+    if not printer:
+        raise HTTPException(status_code=404, detail="Printer not found")
+
+    # Get history data
+    data = await db.get_ams_sensor_history(serial, ams_id, hours)
+
+    # Get statistics
+    stats = await db.get_ams_sensor_stats(serial, ams_id, hours)
+
+    return AMSHistoryResponse(
+        printer_serial=serial,
+        ams_id=ams_id,
+        data=data,
+        min_humidity=stats.get("min_humidity"),
+        max_humidity=stats.get("max_humidity"),
+        avg_humidity=stats.get("avg_humidity"),
+        min_temperature=stats.get("min_temperature"),
+        max_temperature=stats.get("max_temperature"),
+        avg_temperature=stats.get("avg_temperature"),
+    )

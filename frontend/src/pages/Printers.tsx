@@ -1,8 +1,24 @@
 import { useEffect, useState } from "preact/hooks";
-import { api, Printer, DiscoveredPrinter, CalibrationProfile } from "../lib/api";
+import { api, Printer, DiscoveredPrinter, CalibrationProfile, AMSThresholds } from "../lib/api";
 import { useWebSocket } from "../lib/websocket";
 import { AmsCard, ExternalSpool } from "../components/AmsCard";
+import { AMSHistoryModal } from "../components/AMSHistoryModal";
 import { useToast } from "../lib/toast";
+import { Modal } from "../components/inventory/Modal";
+import {
+  Plus,
+  Search,
+  Trash2,
+  ChevronRight,
+  Printer as PrinterIcon,
+  Wifi,
+  WifiOff,
+  Loader2,
+  Info,
+  Image,
+  RefreshCw,
+  Frown,
+} from "lucide-preact";
 
 const EXPANDED_PRINTERS_KEY = "spoolbuddy-expanded-printers";
 
@@ -64,6 +80,13 @@ export function Printers() {
   const [connecting, setConnecting] = useState<string | null>(null); // serial being connected
   const [calibrations, setCalibrations] = useState<Record<string, CalibrationProfile[]>>({}); // serial -> calibrations
   const [expandedPrinters, setExpandedPrinters] = useState<Set<string>>(loadExpandedPrinters); // expanded printers by serial
+  const [amsThresholds, setAmsThresholds] = useState<AMSThresholds | undefined>(undefined);
+  const [historyModal, setHistoryModal] = useState<{
+    printerSerial: string;
+    amsId: number;
+    amsLabel: string;
+    mode: 'humidity' | 'temperature';
+  } | null>(null);
   const { showToast } = useToast();
 
   const toggleExpanded = (serial: string) => {
@@ -130,6 +153,18 @@ export function Printers() {
       }
     });
   }, [printers, printerStatuses]);
+
+  // Load AMS thresholds
+  useEffect(() => {
+    api.getAMSThresholds()
+      .then(setAmsThresholds)
+      .catch(err => console.error("Failed to load AMS thresholds:", err));
+  }, []);
+
+  // Handle AMS history click
+  const handleHistoryClick = (printerSerial: string) => (amsId: number, amsLabel: string, mode: 'humidity' | 'temperature') => {
+    setHistoryModal({ printerSerial, amsId, amsLabel, mode });
+  };
 
   const loadPrinters = async () => {
     try {
@@ -213,24 +248,14 @@ export function Printers() {
           <h1 class="text-3xl font-bold text-[var(--text-primary)]">Printers</h1>
           <p class="text-[var(--text-secondary)]">Manage your Bambu Lab printers</p>
         </div>
-        <div class="flex space-x-3">
-          <button
-            onClick={() => setShowDiscoverModal(true)}
-            class="btn"
-          >
-            <svg class="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            Discover
+        <div class="flex gap-3">
+          <button onClick={() => setShowDiscoverModal(true)} class="btn">
+            <Search class="w-4 h-4" />
+            <span>Discover</span>
           </button>
-          <button
-            onClick={() => setShowAddModal(true)}
-            class="btn btn-primary"
-          >
-            <svg class="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Add Printer
+          <button onClick={() => setShowAddModal(true)} class="btn btn-primary">
+            <Plus class="w-4 h-4" />
+            <span>Add Printer</span>
           </button>
         </div>
       </div>
@@ -238,66 +263,67 @@ export function Printers() {
       {/* Printer list */}
       <div class="card">
         {loading ? (
-          <div class="p-8 text-center text-[var(--text-muted)]">Loading...</div>
+          <div class="p-12 text-center text-[var(--text-muted)] flex items-center justify-center gap-2">
+            <Loader2 class="w-5 h-5 animate-spin" />
+            <span>Loading printers...</span>
+          </div>
         ) : printers.length === 0 ? (
-          <div class="p-8 text-center">
-            <svg class="mx-auto h-12 w-12 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-            </svg>
-            <h3 class="mt-2 text-sm font-medium text-[var(--text-primary)]">No printers</h3>
-            <p class="mt-1 text-sm text-[var(--text-secondary)]">
-              Add a printer to get started with automatic AMS configuration.
-            </p>
-            <div class="mt-6">
-              <button
-                type="button"
-                onClick={() => setShowAddModal(true)}
-                class="btn btn-primary"
-              >
-                <svg class="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Add Printer
-              </button>
+          <div class="flex flex-col items-center justify-center py-16 px-4">
+            <div class="relative mb-6">
+              <div class="absolute inset-0 -m-4 bg-[var(--accent-color)]/5 rounded-full blur-2xl" />
+              <div class="relative flex items-center justify-center w-24 h-24 rounded-2xl bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-tertiary)] border border-[var(--border-color)] shadow-lg">
+                <div class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[var(--accent-color)]/30" />
+                <div class="absolute -bottom-2 -left-2 w-2 h-2 rounded-full bg-[var(--accent-color)]/20" />
+                <PrinterIcon class="w-10 h-10 text-[var(--text-muted)]" strokeWidth={1.5} />
+              </div>
             </div>
+            <h3 class="text-lg font-semibold text-[var(--text-primary)] mb-2 text-center">
+              No printers yet
+            </h3>
+            <p class="text-sm text-[var(--text-muted)] text-center max-w-sm mb-6">
+              Add your Bambu Lab printer to get started with automatic AMS configuration.
+            </p>
+            <button onClick={() => setShowAddModal(true)} class="btn btn-primary">
+              <Plus class="w-4 h-4" />
+              Add Your First Printer
+            </button>
           </div>
         ) : (
           <ul class="divide-y divide-[var(--border-color)]">
             {printers.map((printer) => {
               const state = printerStates.get(printer.serial);
               const connected = isConnected(printer);
-              const isMultiNozzle = printer.model && ["H2C", "H2D"].includes(printer.model.toUpperCase());
+              // Use nozzle_count from state if available, otherwise fall back to model check
+              const nozzleCount = state?.nozzle_count ?? 1;
+              const numExtruders = nozzleCount >= 2 ? 2 : 1;
               const isExpanded = expandedPrinters.has(printer.serial);
               const hasDetails = connected && state && (state.ams_units?.length > 0 || state.vt_tray || (state.gcode_state && state.gcode_state !== "IDLE"));
 
               return (
-                <li key={printer.serial} class="p-6 hover:bg-[var(--bg-secondary)] bg-[var(--bg-primary)] transition-colors">
+                <li key={printer.serial} class="p-4 hover:bg-[var(--bg-tertiary)]/50 transition-colors">
                   <div
                     class="flex items-center justify-between cursor-pointer"
                     onClick={() => hasDetails && toggleExpanded(printer.serial)}
                   >
-                    <div class="flex items-center">
+                    <div class="flex items-center gap-3">
                       {/* Expand/collapse icon */}
-                      <div class="flex-shrink-0 mr-2">
-                        {hasDetails ? (
-                          <svg
-                            class={`h-5 w-5 text-[var(--text-muted)] transition-transform ${isExpanded ? "rotate-90" : ""}`}
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                          </svg>
-                        ) : (
-                          <div class="w-5" />
+                      <div class="flex-shrink-0 w-5">
+                        {hasDetails && (
+                          <ChevronRight
+                            class={`w-5 h-5 text-[var(--text-muted)] transition-transform ${isExpanded ? "rotate-90" : ""}`}
+                          />
                         )}
                       </div>
-                      <div class="flex-shrink-0">
-                        <svg class="h-10 w-10 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                        </svg>
+                      {/* Printer icon */}
+                      <div class={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center ${
+                        connected
+                          ? "bg-[var(--success-color)]/10 text-[var(--success-color)]"
+                          : "bg-[var(--bg-tertiary)] text-[var(--text-muted)]"
+                      }`}>
+                        <PrinterIcon class="w-6 h-6" strokeWidth={1.5} />
                       </div>
-                      <div class="ml-4">
+                      {/* Printer info */}
+                      <div>
                         <p class="text-sm font-medium text-[var(--text-primary)]">
                           {printer.name || printer.serial}
                         </p>
@@ -307,45 +333,43 @@ export function Printers() {
                         <p class="text-xs text-[var(--text-muted)] font-mono">{printer.serial}</p>
                       </div>
                     </div>
-                    <div class="flex items-center space-x-4">
+                    <div class="flex items-center gap-3">
                       {/* Auto-connect toggle */}
                       <button
                         onClick={(e) => { e.stopPropagation(); handleAutoConnectToggle(printer.serial, printer.auto_connect ?? false); }}
-                        class="flex items-center space-x-2 text-sm"
+                        class="flex items-center gap-2 text-sm"
                         title={printer.auto_connect ? "Disable auto-connect" : "Enable auto-connect"}
                       >
-                        <span class={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                          printer.auto_connect ? "bg-primary-600" : "bg-gray-200"
+                        <span class={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out ${
+                          printer.auto_connect ? "bg-[var(--accent-color)]" : "bg-[var(--bg-tertiary)]"
                         }`}>
-                          <span class={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            printer.auto_connect ? "translate-x-4" : "translate-x-0"
+                          <span class={`pointer-events-none inline-block h-4 w-4 mt-0.5 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${
+                            printer.auto_connect ? "translate-x-4 ml-0.5" : "translate-x-0.5"
                           }`} />
                         </span>
-                        <span class="text-xs text-gray-500">Auto</span>
+                        <span class="text-xs text-[var(--text-muted)]">Auto</span>
                       </button>
+                      {/* Status badge */}
                       {connecting === printer.serial ? (
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                          <svg class="animate-spin -ml-0.5 mr-1.5 h-3 w-3" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--warning-color)]/10 text-[var(--warning-color)]">
+                          <Loader2 class="w-3 h-3 animate-spin" />
                           Connecting...
                         </span>
                       ) : (
-                        <span
-                          class={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            connected
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100 text-gray-600"
-                          }`}
-                        >
+                        <span class={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                          connected
+                            ? "bg-[var(--success-color)]/10 text-[var(--success-color)]"
+                            : "bg-[var(--bg-tertiary)] text-[var(--text-muted)]"
+                        }`}>
+                          {connected ? <Wifi class="w-3 h-3" /> : <WifiOff class="w-3 h-3" />}
                           {connected ? "Connected" : "Offline"}
                         </span>
                       )}
+                      {/* Connect/Disconnect button */}
                       {!connected && connecting !== printer.serial && (
                         <button
                           onClick={(e) => { e.stopPropagation(); handleConnect(printer.serial); }}
-                          class="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                          class="btn btn-sm"
                         >
                           Connect
                         </button>
@@ -353,18 +377,18 @@ export function Printers() {
                       {connected && (
                         <button
                           onClick={(e) => { e.stopPropagation(); handleDisconnect(printer.serial); }}
-                          class="text-gray-600 hover:text-gray-700 text-sm font-medium"
+                          class="btn btn-sm btn-ghost"
                         >
                           Disconnect
                         </button>
                       )}
+                      {/* Delete button */}
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDelete(printer.serial); }}
-                        class="text-red-600 hover:text-red-700"
+                        class="p-2 text-[var(--text-muted)] hover:text-[var(--error-color)] hover:bg-[var(--error-color)]/10 rounded-lg transition-colors"
+                        title="Delete printer"
                       >
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
+                        <Trash2 class="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -386,13 +410,15 @@ export function Printers() {
                                     key={unit.id}
                                     unit={unit}
                                     printerModel={printer.model || undefined}
-                                    numExtruders={isMultiNozzle ? 2 : 1}
+                                    numExtruders={numExtruders}
                                     printerSerial={printer.serial}
                                     calibrations={calibrations[printer.serial] || []}
                                     trayNow={state.tray_now}
                                     trayNowLeft={state.tray_now_left}
                                     trayNowRight={state.tray_now_right}
                                     activeExtruder={state.active_extruder}
+                                    amsThresholds={amsThresholds}
+                                    onHistoryClick={handleHistoryClick(printer.serial)}
                                   />
                                 ))}
                             </div>
@@ -407,29 +433,31 @@ export function Printers() {
                                   key={unit.id}
                                   unit={unit}
                                   printerModel={printer.model || undefined}
-                                  numExtruders={isMultiNozzle ? 2 : 1}
+                                  numExtruders={numExtruders}
                                   printerSerial={printer.serial}
                                   calibrations={calibrations[printer.serial] || []}
                                   trayNow={state.tray_now}
                                   trayNowLeft={state.tray_now_left}
                                   trayNowRight={state.tray_now_right}
                                   activeExtruder={state.active_extruder}
+                                  amsThresholds={amsThresholds}
+                                  onHistoryClick={handleHistoryClick(printer.serial)}
                                 />
                               ))}
-                            {/* Ext-1 (L nozzle for multi-nozzle) */}
+                            {/* External spool - Ext for single nozzle, Ext-L for dual nozzle */}
                             <ExternalSpool
                               tray={state.vt_tray}
                               position="left"
-                              numExtruders={isMultiNozzle ? 2 : 1}
+                              numExtruders={numExtruders}
                               printerSerial={printer.serial}
                               calibrations={calibrations[printer.serial] || []}
                             />
-                            {/* Ext-2 (R nozzle) for multi-nozzle printers */}
-                            {isMultiNozzle && (
+                            {/* Ext-R for dual-nozzle printers only */}
+                            {numExtruders >= 2 && (
                               <ExternalSpool
                                 tray={null}
                                 position="right"
-                                numExtruders={2}
+                                numExtruders={numExtruders}
                                 printerSerial={printer.serial}
                                 calibrations={calibrations[printer.serial] || []}
                               />
@@ -444,9 +472,7 @@ export function Printers() {
                           <div class="flex gap-4">
                             {/* Thumbnail placeholder */}
                             <div class="flex-shrink-0 w-16 h-16 bg-[var(--bg-tertiary)] rounded-lg flex items-center justify-center">
-                              <svg class="w-8 h-8 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
+                              <Image class="w-8 h-8 text-[var(--text-muted)]" strokeWidth={1.5} />
                             </div>
 
                             {/* Print info */}
@@ -456,10 +482,10 @@ export function Printers() {
                                   {state.subtask_name || "Printing"}
                                 </span>
                                 <span class={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${
-                                  state.gcode_state === "RUNNING" ? "bg-blue-100 text-blue-700" :
-                                  state.gcode_state === "PAUSE" ? "bg-yellow-100 text-yellow-700" :
-                                  state.gcode_state === "FINISH" ? "bg-green-100 text-green-700" :
-                                  state.gcode_state === "FAILED" ? "bg-red-100 text-red-700" :
+                                  state.gcode_state === "RUNNING" ? "bg-[var(--info-color)]/10 text-[var(--info-color)]" :
+                                  state.gcode_state === "PAUSE" ? "bg-[var(--warning-color)]/10 text-[var(--warning-color)]" :
+                                  state.gcode_state === "FINISH" ? "bg-[var(--success-color)]/10 text-[var(--success-color)]" :
+                                  state.gcode_state === "FAILED" ? "bg-[var(--error-color)]/10 text-[var(--error-color)]" :
                                   "bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
                                 }`}>
                                   {state.gcode_state}
@@ -508,13 +534,9 @@ export function Printers() {
 
       {/* Info card */}
       <div class="bg-[var(--info-color)]/10 border border-[var(--info-color)]/30 rounded-lg p-4">
-        <div class="flex">
-          <div class="flex-shrink-0">
-            <svg class="h-5 w-5 text-[var(--info-color)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <div class="ml-3">
+        <div class="flex gap-3">
+          <Info class="w-5 h-5 text-[var(--info-color)] flex-shrink-0 mt-0.5" />
+          <div>
             <h3 class="text-sm font-medium text-[var(--text-primary)]">Printer Connection</h3>
             <p class="mt-1 text-sm text-[var(--text-secondary)]">
               SpoolBuddy connects to your Bambu Lab printers via MQTT over your local network.
@@ -557,44 +579,48 @@ export function Printers() {
       {deleteConfirm && (() => {
         const printerToDelete = printers.find(p => p.serial === deleteConfirm);
         return (
-        <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div class="bg-white rounded-lg shadow-xl max-w-sm w-full mx-4">
-            <div class="px-6 py-4 border-b border-gray-200">
-              <h2 class="text-lg font-semibold text-gray-900">Delete Printer</h2>
-            </div>
-            <div class="px-6 py-4">
-              <p class="text-sm text-gray-600">
-                Are you sure you want to delete this printer? This action cannot be undone.
+          <Modal
+            isOpen={true}
+            onClose={() => setDeleteConfirm(null)}
+            title="Delete Printer"
+            size="sm"
+            footer={
+              <>
+                <button class="btn" onClick={() => setDeleteConfirm(null)}>
+                  Cancel
+                </button>
+                <button class="btn btn-danger" onClick={confirmDelete}>
+                  Delete
+                </button>
+              </>
+            }
+          >
+            <p class="text-sm text-[var(--text-secondary)]">
+              Are you sure you want to delete this printer? This action cannot be undone.
+            </p>
+            <div class="mt-3 p-3 bg-[var(--bg-tertiary)] rounded-lg">
+              <p class="text-sm font-medium text-[var(--text-primary)]">
+                {printerToDelete?.name || deleteConfirm}
               </p>
-              <div class="mt-3 p-3 bg-gray-50 rounded-md">
-                <p class="text-sm font-medium text-gray-900">
-                  {printerToDelete?.name || deleteConfirm}
-                </p>
-                {printerToDelete?.name && (
-                  <p class="text-xs font-mono text-gray-500 mt-1">{deleteConfirm}</p>
-                )}
-              </div>
+              {printerToDelete?.name && (
+                <p class="text-xs font-mono text-[var(--text-muted)] mt-1">{deleteConfirm}</p>
+              )}
             </div>
-            <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setDeleteConfirm(null)}
-                class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-500"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={confirmDelete}
-                class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
+          </Modal>
         );
       })()}
+
+      {/* AMS History Modal */}
+      {historyModal && (
+        <AMSHistoryModal
+          printerSerial={historyModal.printerSerial}
+          amsId={historyModal.amsId}
+          amsLabel={historyModal.amsLabel}
+          mode={historyModal.mode}
+          thresholds={amsThresholds}
+          onClose={() => setHistoryModal(null)}
+        />
+      )}
     </div>
   );
 }
@@ -710,118 +736,108 @@ function AddPrinterModal({ onClose, onCreated, prefill }: AddPrinterModalProps) 
   };
 
   return (
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-        <div class="px-6 py-4 border-b border-gray-200">
-          <h2 class="text-lg font-semibold text-gray-900">Add Printer</h2>
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="Add Printer"
+      size="md"
+      footer={
+        <>
+          <button class="btn" onClick={onClose} disabled={saving}>
+            Cancel
+          </button>
+          <button class="btn btn-primary" onClick={handleSubmit} disabled={saving}>
+            {saving ? "Adding..." : "Add Printer"}
+          </button>
+        </>
+      }
+    >
+      <div class="space-y-4">
+        {error && (
+          <div class="p-3 bg-[var(--error-color)]/10 border border-[var(--error-color)]/30 rounded-lg text-sm text-[var(--error-color)]">
+            {error}
+          </div>
+        )}
+        <div class="form-field">
+          <label class="form-label">
+            Serial Number <span class="text-[var(--error-color)]">*</span>
+          </label>
+          <input
+            type="text"
+            value={serial}
+            onInput={(e) => setSerial((e.target as HTMLInputElement).value)}
+            placeholder="e.g., 00M09A123456789"
+            class="input font-mono"
+          />
+          <p class="mt-1 text-xs text-[var(--text-muted)]">
+            Found in printer settings or on the label
+          </p>
         </div>
-        <form onSubmit={handleSubmit}>
-          <div class="px-6 py-4 space-y-4">
-            {error && (
-              <div class="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">
-                {error}
-              </div>
-            )}
-            <div>
-              <label class="block text-sm font-medium text-gray-700">
-                Serial Number *
-              </label>
-              <input
-                type="text"
-                value={serial}
-                onInput={(e) => setSerial((e.target as HTMLInputElement).value)}
-                placeholder="e.g., 00M09A123456789"
-                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 font-mono"
-              />
-              <p class="mt-1 text-xs text-gray-500">
-                Found in printer settings or on the label
-              </p>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">
-                Name
-              </label>
-              <input
-                type="text"
-                value={name}
-                onInput={(e) => handleNameChange((e.target as HTMLInputElement).value)}
-                placeholder="e.g., My X1 Carbon"
-                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-              />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">
-                Model {modelAutoDetected && <span class="text-xs text-green-600">(auto-detected)</span>}
-              </label>
-              <select
-                value={model}
-                onChange={(e) => handleModelChange((e.target as HTMLSelectElement).value)}
-                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-              >
-                <option value="" disabled>Select model...</option>
-                <option value="A1">A1</option>
-                <option value="A1-Mini">A1 Mini</option>
-                <option value="H2C">H2C</option>
-                <option value="H2D">H2D</option>
-                <option value="H2S">H2S</option>
-                <option value="P1P">P1P</option>
-                <option value="P1S">P1S</option>
-                <option value="P2S">P2S</option>
-                <option value="X1">X1</option>
-                <option value="X1-Carbon">X1 Carbon</option>
-                <option value="X1E">X1E</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">
-                IP Address *
-              </label>
-              <input
-                type="text"
-                value={ipAddress}
-                onInput={(e) => setIpAddress((e.target as HTMLInputElement).value)}
-                placeholder="e.g., 192.168.1.100"
-                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 font-mono"
-              />
-              <p class="mt-1 text-xs text-gray-500">
-                Found in printer's network settings
-              </p>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">
-                Access Code *
-              </label>
-              <input
-                type="password"
-                value={accessCode}
-                onInput={(e) => setAccessCode((e.target as HTMLInputElement).value)}
-                placeholder="8-digit code"
-                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 font-mono"
-              />
-              <p class="mt-1 text-xs text-gray-500">
-                Found in printer's network settings (LAN Only Mode)
-              </p>
-            </div>
-          </div>
-          <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
-            <button
-              type="button"
-              onClick={onClose}
-              class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-500"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50"
-            >
-              {saving ? "Adding..." : "Add Printer"}
-            </button>
-          </div>
-        </form>
+        <div class="form-field">
+          <label class="form-label">Name</label>
+          <input
+            type="text"
+            value={name}
+            onInput={(e) => handleNameChange((e.target as HTMLInputElement).value)}
+            placeholder="e.g., My X1 Carbon"
+            class="input"
+          />
+        </div>
+        <div class="form-field">
+          <label class="form-label">
+            Model {modelAutoDetected && <span class="text-xs text-[var(--success-color)]">(auto-detected)</span>}
+          </label>
+          <select
+            value={model}
+            onChange={(e) => handleModelChange((e.target as HTMLSelectElement).value)}
+            class="select"
+          >
+            <option value="" disabled>Select model...</option>
+            <option value="A1">A1</option>
+            <option value="A1-Mini">A1 Mini</option>
+            <option value="H2C">H2C</option>
+            <option value="H2D">H2D</option>
+            <option value="H2S">H2S</option>
+            <option value="P1P">P1P</option>
+            <option value="P1S">P1S</option>
+            <option value="P2S">P2S</option>
+            <option value="X1">X1</option>
+            <option value="X1-Carbon">X1 Carbon</option>
+            <option value="X1E">X1E</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label class="form-label">
+            IP Address <span class="text-[var(--error-color)]">*</span>
+          </label>
+          <input
+            type="text"
+            value={ipAddress}
+            onInput={(e) => setIpAddress((e.target as HTMLInputElement).value)}
+            placeholder="e.g., 192.168.1.100"
+            class="input font-mono"
+          />
+          <p class="mt-1 text-xs text-[var(--text-muted)]">
+            Found in printer's network settings
+          </p>
+        </div>
+        <div class="form-field">
+          <label class="form-label">
+            Access Code <span class="text-[var(--error-color)]">*</span>
+          </label>
+          <input
+            type="password"
+            value={accessCode}
+            onInput={(e) => setAccessCode((e.target as HTMLInputElement).value)}
+            placeholder="8-digit code"
+            class="input font-mono"
+          />
+          <p class="mt-1 text-xs text-[var(--text-muted)]">
+            Found in printer's network settings (LAN Only Mode)
+          </p>
+        </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -880,90 +896,73 @@ function DiscoverModal({ onClose, onSelect, existingSerials }: DiscoverModalProp
   }, []);
 
   return (
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4">
-        <div class="px-6 py-4 border-b border-gray-200">
-          <h2 class="text-lg font-semibold text-gray-900">Discover Printers</h2>
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="Discover Printers"
+      size="md"
+      footer={
+        <button class="btn" onClick={onClose}>
+          Close
+        </button>
+      }
+    >
+      {error && (
+        <div class="p-3 bg-[var(--error-color)]/10 border border-[var(--error-color)]/30 rounded-lg text-sm text-[var(--error-color)] mb-4">
+          {error}
         </div>
-        <div class="px-6 py-4">
-          {error && (
-            <div class="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">
-              {error}
-            </div>
-          )}
+      )}
 
-          {discovering && (
-            <div class="flex items-center justify-center py-8">
-              <svg class="animate-spin h-8 w-8 text-primary-600 mr-3" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-              <span class="text-gray-600">Scanning network for Bambu Lab printers...</span>
-            </div>
-          )}
-
-          {!discovering && newPrinters.length === 0 && (
-            <div class="text-center py-8">
-              <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p class="mt-2 text-sm text-gray-500">No new printers found on your network.</p>
-              <p class="text-xs text-gray-400 mt-1">Make sure your printers are powered on and connected to the same network.</p>
-              <button
-                onClick={startDiscovery}
-                class="mt-4 px-4 py-2 text-sm font-medium text-primary-600 hover:text-primary-700"
-              >
-                Scan Again
-              </button>
-            </div>
-          )}
-
-          {newPrinters.length > 0 && (
-            <ul class="divide-y divide-gray-200">
-              {newPrinters.map((printer) => (
-                <li
-                  key={printer.serial}
-                  class="py-4 flex items-center justify-between hover:bg-gray-50 cursor-pointer px-2 -mx-2 rounded"
-                  onClick={() => onSelect(printer)}
-                >
-                  <div>
-                    <p class="text-sm font-medium text-gray-900">
-                      {printer.name || printer.serial}
-                    </p>
-                    <p class="text-sm text-gray-500">
-                      {printer.model || "Unknown Model"} &bull; {printer.ip_address}
-                    </p>
-                    <p class="text-xs text-gray-400 font-mono">{printer.serial}</p>
-                  </div>
-                  <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                  </svg>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {!discovering && newPrinters.length > 0 && (
-            <div class="mt-4 text-center">
-              <button
-                onClick={startDiscovery}
-                class="text-sm text-primary-600 hover:text-primary-700"
-              >
-                Scan Again
-              </button>
-            </div>
-          )}
+      {discovering && (
+        <div class="flex items-center justify-center py-8 gap-3">
+          <Loader2 class="w-8 h-8 text-[var(--accent-color)] animate-spin" />
+          <span class="text-[var(--text-secondary)]">Scanning network for Bambu Lab printers...</span>
         </div>
-        <div class="px-6 py-4 border-t border-gray-200 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-500"
-          >
-            Close
+      )}
+
+      {!discovering && newPrinters.length === 0 && (
+        <div class="text-center py-8">
+          <Frown class="mx-auto w-12 h-12 text-[var(--text-muted)]" strokeWidth={1.5} />
+          <p class="mt-3 text-sm text-[var(--text-secondary)]">No new printers found on your network.</p>
+          <p class="text-xs text-[var(--text-muted)] mt-1">Make sure your printers are powered on and connected to the same network.</p>
+          <button onClick={startDiscovery} class="btn btn-ghost mt-4">
+            <RefreshCw class="w-4 h-4" />
+            Scan Again
           </button>
         </div>
-      </div>
-    </div>
+      )}
+
+      {newPrinters.length > 0 && (
+        <ul class="divide-y divide-[var(--border-color)]">
+          {newPrinters.map((printer) => (
+            <li
+              key={printer.serial}
+              class="py-3 flex items-center justify-between hover:bg-[var(--bg-tertiary)] cursor-pointer px-3 -mx-3 rounded-lg transition-colors"
+              onClick={() => onSelect(printer)}
+            >
+              <div>
+                <p class="text-sm font-medium text-[var(--text-primary)]">
+                  {printer.name || printer.serial}
+                </p>
+                <p class="text-sm text-[var(--text-secondary)]">
+                  {printer.model || "Unknown Model"} &bull; {printer.ip_address}
+                </p>
+                <p class="text-xs text-[var(--text-muted)] font-mono">{printer.serial}</p>
+              </div>
+              <ChevronRight class="w-5 h-5 text-[var(--text-muted)]" />
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {!discovering && newPrinters.length > 0 && (
+        <div class="mt-4 text-center">
+          <button onClick={startDiscovery} class="btn btn-ghost btn-sm">
+            <RefreshCw class="w-4 h-4" />
+            Scan Again
+          </button>
+        </div>
+      )}
+    </Modal>
   );
 }

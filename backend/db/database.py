@@ -108,12 +108,24 @@ CREATE TABLE IF NOT EXISTS spool_catalog (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_spool_catalog_name ON spool_catalog(name);
 
+-- AMS sensor history (for humidity/temperature graphs)
+CREATE TABLE IF NOT EXISTS ams_sensor_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    printer_serial TEXT NOT NULL REFERENCES printers(serial) ON DELETE CASCADE,
+    ams_id INTEGER NOT NULL,
+    humidity REAL,
+    humidity_raw REAL,
+    temperature REAL,
+    recorded_at INTEGER DEFAULT (strftime('%s', 'now'))
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_spools_tag_id ON spools(tag_id);
 CREATE INDEX IF NOT EXISTS idx_spools_material ON spools(material);
 CREATE INDEX IF NOT EXISTS idx_k_profiles_spool ON k_profiles(spool_id);
 CREATE INDEX IF NOT EXISTS idx_usage_history_spool ON usage_history(spool_id);
 CREATE INDEX IF NOT EXISTS idx_spool_assignments_slot ON spool_assignments(printer_serial, ams_id, tray_id);
+CREATE INDEX IF NOT EXISTS idx_ams_sensor_history_lookup ON ams_sensor_history(printer_serial, ams_id, recorded_at);
 """
 
 # Default spool catalog data (name, weight in grams)
@@ -830,6 +842,80 @@ class Database:
                 (name, weight)
             )
         await self.conn.commit()
+
+    # ============ AMS Sensor History Operations ============
+
+    async def record_ams_sensor(
+        self,
+        printer_serial: str,
+        ams_id: int,
+        humidity: Optional[float],
+        humidity_raw: Optional[float],
+        temperature: Optional[float]
+    ) -> int:
+        """Record AMS sensor reading (humidity/temperature)."""
+        now = int(time.time())
+        cursor = await self.conn.execute(
+            """INSERT INTO ams_sensor_history (printer_serial, ams_id, humidity, humidity_raw, temperature, recorded_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (printer_serial, ams_id, humidity, humidity_raw, temperature, now)
+        )
+        await self.conn.commit()
+        return cursor.lastrowid
+
+    async def get_ams_sensor_history(
+        self,
+        printer_serial: str,
+        ams_id: int,
+        hours: int = 24
+    ) -> list[dict]:
+        """Get AMS sensor history for a given time range."""
+        now = int(time.time())
+        since = now - (hours * 3600)
+        async with self.conn.execute(
+            """SELECT humidity, humidity_raw, temperature, recorded_at
+               FROM ams_sensor_history
+               WHERE printer_serial = ? AND ams_id = ? AND recorded_at >= ?
+               ORDER BY recorded_at ASC""",
+            (printer_serial, ams_id, since)
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    async def get_ams_sensor_stats(
+        self,
+        printer_serial: str,
+        ams_id: int,
+        hours: int = 24
+    ) -> dict:
+        """Get AMS sensor statistics (min/max/avg) for a given time range."""
+        now = int(time.time())
+        since = now - (hours * 3600)
+        async with self.conn.execute(
+            """SELECT
+                 MIN(humidity) as min_humidity,
+                 MAX(humidity) as max_humidity,
+                 AVG(humidity) as avg_humidity,
+                 MIN(temperature) as min_temperature,
+                 MAX(temperature) as max_temperature,
+                 AVG(temperature) as avg_temperature,
+                 COUNT(*) as count
+               FROM ams_sensor_history
+               WHERE printer_serial = ? AND ams_id = ? AND recorded_at >= ?""",
+            (printer_serial, ams_id, since)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return dict(row) if row else {}
+
+    async def cleanup_ams_sensor_history(self, retention_days: int = 30) -> int:
+        """Delete AMS sensor history older than retention period."""
+        cutoff = int(time.time()) - (retention_days * 24 * 3600)
+        cursor = await self.conn.execute(
+            "DELETE FROM ams_sensor_history WHERE recorded_at < ?",
+            (cutoff,)
+        )
+        await self.conn.commit()
+        return cursor.rowcount
 
 
 # Global database instance

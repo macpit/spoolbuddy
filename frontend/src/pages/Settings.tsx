@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "preact/hooks";
 import { useWebSocket } from "../lib/websocket";
-import { api, CloudAuthStatus, VersionInfo, UpdateCheck, UpdateStatus, FirmwareCheck } from "../lib/api";
-import { Cloud, CloudOff, LogOut, Loader2, Mail, Lock, Key, Download, RefreshCw, CheckCircle, AlertCircle, GitBranch, ExternalLink, Wifi, WifiOff, Cpu, Usb, RotateCcw, Upload, HardDrive, Palette, Sun, Moon, LayoutDashboard, Settings2, Package, Monitor, Scale, X, ChevronRight } from "lucide-preact";
+import { api, CloudAuthStatus, VersionInfo, UpdateCheck, UpdateStatus, FirmwareCheck, AMSThresholds } from "../lib/api";
+import { Cloud, CloudOff, LogOut, Loader2, Mail, Lock, Key, Download, RefreshCw, CheckCircle, AlertCircle, GitBranch, ExternalLink, Wifi, WifiOff, Cpu, Usb, RotateCcw, Upload, HardDrive, Palette, Sun, Moon, LayoutDashboard, Settings2, Package, Monitor, Scale, X, ChevronRight, Droplets, Thermometer } from "lucide-preact";
 import { useToast } from "../lib/toast";
 import { SerialTerminal } from "../components/SerialTerminal";
 import { SpoolCatalogSettings } from "../components/SpoolCatalogSettings";
@@ -100,6 +100,232 @@ function DashboardSettings() {
             />
             <span class="text-sm text-[var(--text-muted)]">g</span>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AMSSettings() {
+  const { showToast } = useToast();
+  const [thresholds, setThresholds] = useState<AMSThresholds | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [pendingChanges, setPendingChanges] = useState<Partial<AMSThresholds>>({});
+
+  useEffect(() => {
+    api.getAMSThresholds()
+      .then(setThresholds)
+      .catch(err => {
+        console.error("Failed to load AMS thresholds:", err);
+        // Use defaults on error
+        setThresholds({
+          humidity_good: 40,
+          humidity_fair: 60,
+          temp_good: 28,
+          temp_fair: 35,
+          history_retention_days: 30,
+        });
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Debounced save - only save after 500ms of no changes
+  useEffect(() => {
+    if (Object.keys(pendingChanges).length === 0 || !thresholds) return;
+
+    const timeout = setTimeout(async () => {
+      const updated = { ...thresholds, ...pendingChanges };
+      setSaving(true);
+      try {
+        await api.setAMSThresholds(updated);
+        setThresholds(updated);
+        setPendingChanges({});
+        showToast('success', 'AMS thresholds saved');
+      } catch (err) {
+        showToast('error', 'Failed to save thresholds');
+      } finally {
+        setSaving(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeout);
+  }, [pendingChanges, thresholds, showToast]);
+
+  const updateThreshold = (key: keyof AMSThresholds, value: number) => {
+    if (!thresholds) return;
+    setPendingChanges(prev => ({ ...prev, [key]: value }));
+    // Update local display immediately
+    setThresholds(prev => prev ? { ...prev, [key]: value } : prev);
+  };
+
+  if (loading) {
+    return (
+      <div class="card">
+        <div class="px-6 py-4 border-b border-[var(--border-color)]">
+          <div class="flex items-center gap-2">
+            <Droplets class="w-5 h-5 text-[var(--text-muted)]" />
+            <h2 class="text-lg font-medium text-[var(--text-primary)]">AMS Sensors</h2>
+          </div>
+        </div>
+        <div class="p-6 flex items-center justify-center">
+          <Loader2 class="w-5 h-5 animate-spin text-[var(--text-muted)]" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div class="card">
+      <div class="px-6 py-4 border-b border-[var(--border-color)]">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <Droplets class="w-5 h-5 text-[var(--text-muted)]" />
+            <h2 class="text-lg font-medium text-[var(--text-primary)]">AMS Sensors</h2>
+          </div>
+          {saving && (
+            <span class="text-xs text-[var(--text-muted)] flex items-center gap-1.5">
+              <Loader2 class="w-3 h-3 animate-spin" />
+              Saving...
+            </span>
+          )}
+        </div>
+      </div>
+      <div class="p-6 space-y-4">
+        <p class="text-sm text-[var(--text-secondary)]">
+          Click humidity/temperature on AMS cards to view graphs. Values are colored based on thresholds below.
+        </p>
+
+        {/* Thresholds Table */}
+        <div class="overflow-hidden rounded-lg border border-[var(--border-color)]">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-[var(--bg-tertiary)]">
+                <th class="px-4 py-2 text-left text-xs font-medium text-[var(--text-muted)]">Metric</th>
+                <th class="px-4 py-2 text-center text-xs font-medium text-[#22c55e]">Good</th>
+                <th class="px-4 py-2 text-center text-xs font-medium text-[#eab308]">Fair</th>
+                <th class="px-4 py-2 text-center text-xs font-medium text-[#ef4444]">High</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[var(--border-color)]">
+              <tr>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-2">
+                    <Droplets class="w-4 h-4 text-blue-500" />
+                    <span class="text-[var(--text-primary)]">Humidity</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <div class="flex items-center justify-center gap-1">
+                    <span class="text-[var(--text-muted)]">&le;</span>
+                    <input
+                      type="number"
+                      min="10"
+                      max="80"
+                      value={thresholds?.humidity_good ?? 40}
+                      onInput={(e) => {
+                        const val = parseInt((e.target as HTMLInputElement).value);
+                        if (!isNaN(val) && val >= 10 && val <= 80) updateThreshold('humidity_good', val);
+                      }}
+                      class="w-14 px-2 py-1 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded text-center text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                      disabled={saving}
+                    />
+                    <span class="text-[var(--text-muted)]">%</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <div class="flex items-center justify-center gap-1">
+                    <span class="text-[var(--text-muted)]">&le;</span>
+                    <input
+                      type="number"
+                      min="20"
+                      max="90"
+                      value={thresholds?.humidity_fair ?? 60}
+                      onInput={(e) => {
+                        const val = parseInt((e.target as HTMLInputElement).value);
+                        if (!isNaN(val) && val >= 20 && val <= 90) updateThreshold('humidity_fair', val);
+                      }}
+                      class="w-14 px-2 py-1 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded text-center text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                      disabled={saving}
+                    />
+                    <span class="text-[var(--text-muted)]">%</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-center text-[var(--text-muted)]">
+                  &gt; {thresholds?.humidity_fair ?? 60}%
+                </td>
+              </tr>
+              <tr>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-2">
+                    <Thermometer class="w-4 h-4 text-orange-500" />
+                    <span class="text-[var(--text-primary)]">Temperature</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <div class="flex items-center justify-center gap-1">
+                    <span class="text-[var(--text-muted)]">&le;</span>
+                    <input
+                      type="number"
+                      min="15"
+                      max="40"
+                      step="0.5"
+                      value={thresholds?.temp_good ?? 28}
+                      onInput={(e) => {
+                        const val = parseFloat((e.target as HTMLInputElement).value);
+                        if (!isNaN(val) && val >= 15 && val <= 40) updateThreshold('temp_good', val);
+                      }}
+                      class="w-14 px-2 py-1 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded text-center text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                      disabled={saving}
+                    />
+                    <span class="text-[var(--text-muted)]">°C</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <div class="flex items-center justify-center gap-1">
+                    <span class="text-[var(--text-muted)]">&le;</span>
+                    <input
+                      type="number"
+                      min="20"
+                      max="50"
+                      step="0.5"
+                      value={thresholds?.temp_fair ?? 35}
+                      onInput={(e) => {
+                        const val = parseFloat((e.target as HTMLInputElement).value);
+                        if (!isNaN(val) && val >= 20 && val <= 50) updateThreshold('temp_fair', val);
+                      }}
+                      class="w-14 px-2 py-1 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded text-center text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                      disabled={saving}
+                    />
+                    <span class="text-[var(--text-muted)]">°C</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-center text-[var(--text-muted)]">
+                  &gt; {thresholds?.temp_fair ?? 35}°C
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* History Retention */}
+        <div class="flex items-center justify-between pt-2">
+          <div>
+            <p class="text-sm font-medium text-[var(--text-primary)]">History Retention</p>
+            <p class="text-xs text-[var(--text-muted)]">How long to keep sensor history</p>
+          </div>
+          <select
+            value={thresholds?.history_retention_days ?? 30}
+            onChange={(e) => updateThreshold('history_retention_days', parseInt((e.target as HTMLSelectElement).value))}
+            class="px-3 py-1.5 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+            disabled={saving}
+          >
+            <option value="7">7 days</option>
+            <option value="14">14 days</option>
+            <option value="30">30 days</option>
+            <option value="60">60 days</option>
+            <option value="90">90 days</option>
+          </select>
         </div>
       </div>
     </div>
@@ -891,13 +1117,21 @@ export function Settings() {
 
         {/* ============ FILAMENT TAB ============ */}
         {activeTab === 'filament' && (
-          <div class="space-y-6">
-            {/* Dashboard settings */}
-            <div id="dashboard" class="scroll-mt-20">
-              <DashboardSettings />
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Column */}
+            <div class="space-y-6">
+              {/* Dashboard settings */}
+              <div id="dashboard" class="scroll-mt-20">
+                <DashboardSettings />
+              </div>
+
+              {/* AMS Settings */}
+              <div id="ams" class="scroll-mt-20">
+                <AMSSettings />
+              </div>
             </div>
 
-            {/* Spool Catalog */}
+            {/* Right Column - Spool Catalog */}
             <div id="catalog" class="scroll-mt-20">
               <SpoolCatalogSettings />
             </div>
