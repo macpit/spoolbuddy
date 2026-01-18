@@ -77,6 +77,7 @@ class PrinterUpdate(BaseModel):
 class Printer(PrinterBase):
     last_seen: Optional[int] = None
     config: Optional[str] = None
+    nozzle_count: int = 1  # 1 or 2, auto-detected from MQTT
 
     class Config:
         from_attributes = True
@@ -117,6 +118,7 @@ class PrinterWithStatus(BaseModel):
     last_seen: Optional[int] = None
     config: Optional[str] = None
     auto_connect: bool = False
+    nozzle_count: int = 1  # 1 or 2, auto-detected from MQTT
     connected: bool = False
     # Live state from MQTT
     gcode_state: Optional[str] = None
@@ -158,6 +160,8 @@ class PrinterState(BaseModel):
     stg_cur_name: Optional[str] = None  # Human-readable stage name
     # Tray reading state (for tracking RFID scanning)
     tray_reading_bits: Optional[int] = None  # Bitmask of trays currently being read
+    # Nozzle count (auto-detected from MQTT device.extruder.info)
+    nozzle_count: int = 1  # 1 = single nozzle, 2 = dual nozzle (H2C/H2D)
 
 
 # ============ AMS Filament Setting ============

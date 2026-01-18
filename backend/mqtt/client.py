@@ -139,7 +139,9 @@ class PrinterConnection:
     _pending_assignments: dict = field(default_factory=dict, repr=False)  # (ams_id, tray_id) -> PendingAssignment
     _on_assignment_complete: Optional[Callable[[str, int, int, str, bool], None]] = field(default=None, repr=False)  # (serial, ams_id, tray_id, spool_id, success)
     _on_tray_reading_change: Optional[Callable[[str, Optional[int], int], None]] = field(default=None, repr=False)  # (serial, old_bits, new_bits)
+    _on_nozzle_count_update: Optional[Callable[[str, int], None]] = field(default=None, repr=False)  # (serial, nozzle_count)
     _nozzle_diameters: dict = field(default_factory=dict, repr=False)  # extruder_id -> nozzle_diameter string
+    _nozzle_count_detected: bool = field(default=False, repr=False)  # Track if we've already detected nozzle count
 
     @property
     def connected(self) -> bool:
@@ -767,6 +769,19 @@ class PrinterConnection:
         extruder_state = extruder_data.get("state")
 
         if extruder_info:
+            # Detect dual-nozzle: must have 2+ extruder entries (single-nozzle may have 1)
+            if len(extruder_info) >= 2:
+                # Set nozzle_count on state so frontend can detect dual-nozzle
+                self._state.nozzle_count = 2
+                if not self._nozzle_count_detected:
+                    self._nozzle_count_detected = True
+                    logger.info(f"[{self.serial}] Detected dual-nozzle printer (extruder_info has {len(extruder_info)} entries)")
+                    if self._on_nozzle_count_update and self._loop:
+                        serial = self.serial  # Capture for lambda
+                        self._loop.call_soon_threadsafe(
+                            lambda s=serial: self._on_nozzle_count_update(s, 2)
+                        )
+
             # Parse per-extruder tray_now values from 'snow' field
             # snow is encoded as: (ams_id << 8) | slot_id
             # We decode it to a global tray index: ams_id * 4 + slot_id
@@ -895,20 +910,23 @@ class PrinterConnection:
         # Track if we have info field in this update (helps debug)
         has_info_field = any(unit.get("info") is not None for unit in ams_data["ams"])
 
-        for ams_unit in ams_data["ams"]:
-            unit_id = self._safe_int(ams_unit.get("id"), 0)
-            info = ams_unit.get("info")
-            if info is not None:
-                try:
-                    info_val = int(info) if isinstance(info, str) else info
-                    # Extract bit 8 for extruder assignment
-                    # Bit 8 = 0 means LEFT extruder (id 1), bit 8 = 1 means RIGHT extruder (id 0)
-                    # So we invert: extruder_id = 1 - bit8
-                    bit8 = (info_val >> 8) & 0x1
-                    extruder_id = 1 - bit8  # 0=right, 1=left
-                    self._ams_extruder_map[unit_id] = extruder_id
-                except (ValueError, TypeError):
-                    pass
+        # Only parse extruder assignments for dual-nozzle printers
+        # Single-nozzle printers also have info field but don't have dual extruders
+        if self._nozzle_count_detected:
+            for ams_unit in ams_data["ams"]:
+                unit_id = self._safe_int(ams_unit.get("id"), 0)
+                info = ams_unit.get("info")
+                if info is not None:
+                    try:
+                        info_val = int(info) if isinstance(info, str) else info
+                        # Extract bit 8 for extruder assignment
+                        # Bit 8 = 0 means LEFT extruder (id 1), bit 8 = 1 means RIGHT extruder (id 0)
+                        # So we invert: extruder_id = 1 - bit8
+                        bit8 = (info_val >> 8) & 0x1
+                        extruder_id = 1 - bit8  # 0=right, 1=left
+                        self._ams_extruder_map[unit_id] = extruder_id
+                    except (ValueError, TypeError):
+                        pass
 
         # Collect trays to check for pending assignments
         trays_to_check = []
@@ -929,8 +947,8 @@ class PrinterConnection:
             # Temperature from temp field
             temp = self._safe_float(ams_unit.get("temp"))
 
-            # Get extruder from our persisted map
-            extruder = self._ams_extruder_map.get(unit_id)
+            # Get extruder from our persisted map (only for dual-nozzle printers)
+            extruder = self._ams_extruder_map.get(unit_id) if self._nozzle_count_detected else None
 
             # Parse trays
             trays = []
@@ -1042,6 +1060,7 @@ class PrinterManager:
         self._on_connect: Optional[Callable[[str], None]] = None
         self._on_assignment_complete: Optional[Callable[[str, int, int, str, bool], None]] = None
         self._on_tray_reading_change: Optional[Callable[[str, Optional[int], int], None]] = None
+        self._on_nozzle_count_update: Optional[Callable[[str, int], None]] = None
 
     def set_state_callback(self, callback: Callable[[str, PrinterState], None]):
         """Set callback for printer state updates."""
@@ -1076,6 +1095,17 @@ class PrinterManager:
         for conn in self._connections.values():
             conn._on_tray_reading_change = callback
 
+    def set_nozzle_count_callback(self, callback: Callable[[str, int], None]):
+        """Set callback for when nozzle count is detected from MQTT.
+
+        Callback receives: (serial, nozzle_count)
+        Used to auto-detect dual-nozzle printers (H2C/H2D).
+        """
+        self._on_nozzle_count_update = callback
+        # Also set on existing connections
+        for conn in self._connections.values():
+            conn._on_nozzle_count_update = callback
+
     async def connect(self, serial: str, ip_address: str, access_code: str, name: Optional[str] = None):
         """Connect to a printer."""
         if serial in self._connections:
@@ -1096,6 +1126,10 @@ class PrinterManager:
         # Set tray reading callback if configured
         if self._on_tray_reading_change:
             conn._on_tray_reading_change = self._on_tray_reading_change
+
+        # Set nozzle count callback if configured
+        if self._on_nozzle_count_update:
+            conn._on_nozzle_count_update = self._on_nozzle_count_update
 
         try:
             conn.connect(self._handle_state_update, self._handle_disconnect, self._handle_connect)

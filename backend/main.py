@@ -474,6 +474,22 @@ def on_printer_disconnect(serial: str):
         pass  # No running loop
 
 
+def on_nozzle_count_update(serial: str, nozzle_count: int):
+    """Handle nozzle count detection from MQTT (auto-detect dual-nozzle printers)."""
+    logger.info(f"Printer {serial} detected as {nozzle_count}-nozzle printer")
+
+    async def update_db():
+        db = await get_db()
+        await db.update_nozzle_count(serial, nozzle_count)
+
+    # Schedule database update in event loop
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(update_db())
+    except RuntimeError:
+        pass  # No running loop
+
+
 # Store recent assignment completions for polling (used by simulator)
 # Format: [(timestamp, serial, ams_id, tray_id, spool_id, success), ...]
 _assignment_completions: list[tuple] = []
@@ -576,6 +592,7 @@ async def lifespan(app: FastAPI):
     printer_manager.set_disconnect_callback(on_printer_disconnect)
     printer_manager.set_assignment_complete_callback(on_assignment_complete)
     printer_manager.set_tray_reading_callback(on_tray_reading_change)
+    printer_manager.set_nozzle_count_callback(on_nozzle_count_update)
 
     # Register mDNS service for device discovery
     # Service type must be <= 15 chars, using "_spbuddy-srv" (12 chars)

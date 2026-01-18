@@ -38,6 +38,8 @@ export interface PrinterState {
   active_extruder: number | null; // Currently active extruder (0=right, 1=left)
   // Tray reading state (RFID scanning)
   tray_reading_bits: number | null; // Bitmask of trays currently being read
+  // Nozzle count (auto-detected from MQTT)
+  nozzle_count: number; // 1 = single nozzle, 2 = dual nozzle (H2C/H2D)
 }
 
 interface WebSocketState {

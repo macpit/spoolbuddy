@@ -51,7 +51,8 @@ CREATE TABLE IF NOT EXISTS printers (
     access_code TEXT,
     last_seen INTEGER,
     config TEXT,
-    auto_connect INTEGER DEFAULT 0
+    auto_connect INTEGER DEFAULT 0,
+    nozzle_count INTEGER DEFAULT 1
 );
 
 -- K-Profiles table
@@ -269,6 +270,14 @@ class Database:
 
         if 'archived_at' not in columns:
             await self.conn.execute("ALTER TABLE spools ADD COLUMN archived_at INTEGER")
+            await self.conn.commit()
+
+        # Check printers table for nozzle_count
+        async with self.conn.execute("PRAGMA table_info(printers)") as cursor:
+            printer_columns = [row['name'] for row in await cursor.fetchall()]
+
+        if 'nozzle_count' not in printer_columns:
+            await self.conn.execute("ALTER TABLE printers ADD COLUMN nozzle_count INTEGER DEFAULT 1")
             await self.conn.commit()
 
     async def disconnect(self):
@@ -512,6 +521,15 @@ class Database:
     async def delete_printer(self, serial: str) -> bool:
         """Delete a printer."""
         cursor = await self.conn.execute("DELETE FROM printers WHERE serial = ?", (serial,))
+        await self.conn.commit()
+        return cursor.rowcount > 0
+
+    async def update_nozzle_count(self, serial: str, nozzle_count: int) -> bool:
+        """Update printer nozzle_count (auto-detected from MQTT)."""
+        cursor = await self.conn.execute(
+            "UPDATE printers SET nozzle_count = ? WHERE serial = ?",
+            (nozzle_count, serial)
+        )
         await self.conn.commit()
         return cursor.rowcount > 0
 

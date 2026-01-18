@@ -313,73 +313,91 @@ export function Dashboard() {
     }
   };
 
-  // Format remaining time
-  const formatRemainingTime = (minutes: number | null | undefined): string | null => {
-    if (minutes === null || minutes === undefined || minutes <= 0) return null;
-    if (minutes < 60) return `${minutes}m`;
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-  };
-
   // Calculate stats
   const totalSpools = spools.length;
   const materials = new Set(spools.map((s) => s.material)).size;
   const brands = new Set(spools.filter((s) => s.brand).map((s) => s.brand)).size;
 
   return (
-    <div class="space-y-6">
-      {/* Page header */}
-      <div class="flex items-start justify-between">
-        <div>
-          <h1 class="text-3xl font-bold text-[var(--text-primary)]">Dashboard</h1>
-          <p class="text-[var(--text-secondary)]">Overview of your filament inventory</p>
-        </div>
-        {/* Cloud status indicator */}
-        {cloudStatus && (
-          <Link
-            href="/settings"
-            class={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              cloudStatus.is_authenticated
-                ? "bg-green-500/20 text-green-500 hover:bg-green-500/30"
-                : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:bg-[var(--border-color)]"
-            }`}
-            title={cloudStatus.is_authenticated ? `Cloud: ${cloudStatus.email}` : "Cloud: Not connected"}
-          >
-            {cloudStatus.is_authenticated ? (
-              <Cloud class="w-4 h-4" />
-            ) : (
-              <CloudOff class="w-4 h-4" />
+    <div class="space-y-8">
+      {/* Page header with stats bar */}
+      <div class="flex flex-col gap-4">
+        <div class="flex items-center justify-between">
+          <h1 class="text-2xl font-bold text-[var(--text-primary)]">Dashboard</h1>
+          <div class="flex items-center gap-3">
+            {/* Cloud status indicator */}
+            {cloudStatus && (
+              <Link
+                href="/settings"
+                class={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 ${
+                  cloudStatus.is_authenticated
+                    ? "bg-green-500/15 text-green-500 hover:bg-green-500/25"
+                    : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:bg-[var(--border-color)]"
+                }`}
+                title={cloudStatus.is_authenticated ? `Cloud: ${cloudStatus.email}` : "Cloud: Not connected"}
+              >
+                {cloudStatus.is_authenticated ? (
+                  <Cloud class="w-3.5 h-3.5" />
+                ) : (
+                  <CloudOff class="w-3.5 h-3.5" />
+                )}
+                <span class="hidden sm:inline">
+                  {cloudStatus.is_authenticated ? "Cloud" : "Offline"}
+                </span>
+              </Link>
             )}
-            <span class="hidden sm:inline">
-              {cloudStatus.is_authenticated ? "Cloud Connected" : "Cloud Offline"}
-            </span>
-          </Link>
-        )}
+            {/* Add spool button */}
+            <Link href="/inventory?add=true" class="btn btn-primary btn-sm">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              <span class="hidden sm:inline">Add Spool</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Compact stats bar */}
+        <div class="flex items-center gap-6 px-4 py-3 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)]">
+          <div class="flex items-center gap-2">
+            <span class="text-2xl font-bold text-[var(--text-primary)]">{loading ? "—" : totalSpools}</span>
+            <span class="text-sm text-[var(--text-muted)]">Spools</span>
+          </div>
+          <div class="w-px h-6 bg-[var(--border-color)]" />
+          <div class="flex items-center gap-2">
+            <span class="text-2xl font-bold text-[var(--text-primary)]">{loading ? "—" : materials}</span>
+            <span class="text-sm text-[var(--text-muted)]">Materials</span>
+          </div>
+          <div class="w-px h-6 bg-[var(--border-color)]" />
+          <div class="flex items-center gap-2">
+            <span class="text-2xl font-bold text-[var(--text-primary)]">{loading ? "—" : brands}</span>
+            <span class="text-sm text-[var(--text-muted)]">Brands</span>
+          </div>
+        </div>
       </div>
 
       {/* Cloud status banner */}
       {cloudStatus && !cloudStatus.is_authenticated && !cloudBannerDismissed && (
-        <div class="flex items-center justify-between gap-4 p-4 bg-[var(--accent-color)]/10 border border-[var(--accent-color)]/30 rounded-lg">
+        <div class="flex items-center justify-between gap-4 p-4 bg-[var(--accent-color)]/10 border border-[var(--accent-color)]/20 rounded-xl">
           <div class="flex items-center gap-3">
-            <CloudOff class="w-5 h-5 text-[var(--accent-color)]" />
+            <div class="p-2 bg-[var(--accent-color)]/20 rounded-lg">
+              <CloudOff class="w-5 h-5 text-[var(--accent-color)]" />
+            </div>
             <div>
               <p class="text-sm font-medium text-[var(--text-primary)]">
-                Connect to Bambu Cloud for custom filament presets
+                Connect to Bambu Cloud
               </p>
               <p class="text-xs text-[var(--text-secondary)]">
-                Login in Settings to access your custom slicer presets when adding spools
+                Access your custom slicer presets
               </p>
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <Link href="/settings" class="btn btn-primary text-sm px-3 py-1.5">
-              <Cloud class="w-4 h-4" />
+            <Link href="/settings" class="btn btn-primary btn-sm">
               Connect
             </Link>
             <button
               onClick={dismissCloudBanner}
-              class="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+              class="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors rounded-lg hover:bg-[var(--bg-tertiary)]"
               title="Dismiss"
             >
               <X class="w-4 h-4" />
@@ -388,360 +406,286 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* Stats cards */}
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="card p-6">
-          <div class="flex items-center">
-            <div class="p-3 bg-blue-500/20 rounded-full">
-              <svg class="w-8 h-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-            </div>
-            <div class="ml-4">
-              <p class="text-sm font-medium text-[var(--text-muted)]">Total Spools</p>
-              <p class="text-2xl font-semibold text-[var(--text-primary)]">
-                {loading ? "-" : totalSpools}
-              </p>
-            </div>
-          </div>
-        </div>
+      {/* Main content grid - Current Spool as hero + side panels */}
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        <div class="card p-6">
-          <div class="flex items-center">
-            <div class="p-3 bg-green-500/20 rounded-full">
-              <svg class="w-8 h-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-              </svg>
-            </div>
-            <div class="ml-4">
-              <p class="text-sm font-medium text-[var(--text-muted)]">Materials</p>
-              <p class="text-2xl font-semibold text-[var(--text-primary)]">
-                {loading ? "-" : materials}
-              </p>
-            </div>
-          </div>
-        </div>
+        {/* Left column: Device Status + Printers */}
+        <div class="space-y-6 lg:col-span-1">
 
-        <div class="card p-6">
-          <div class="flex items-center">
-            <div class="p-3 bg-purple-500/20 rounded-full">
-              <svg class="w-8 h-8 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-            </div>
-            <div class="ml-4">
-              <p class="text-sm font-medium text-[var(--text-muted)]">Brands</p>
-              <p class="text-2xl font-semibold text-[var(--text-primary)]">
-                {loading ? "-" : brands}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Printer status */}
-      {printers.length > 0 && (
-        <div class="card p-6">
-          <h2 class="text-lg font-semibold text-[var(--text-primary)] mb-4">Printers</h2>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {printers.map((printer) => {
-              const stateInfo = getPrinterStateInfo(printer);
-              const hasProgress = stateInfo.progress !== undefined && stateInfo.progress !== null;
-              const remainingTimeStr = formatRemainingTime(stateInfo.remainingTime);
-
-              return (
-                <Link
-                  key={printer.serial}
-                  href="/printers"
-                  class="block p-3 bg-[var(--bg-tertiary)] rounded-lg hover:bg-[var(--border-color)] transition-colors"
-                >
-                  {/* Header row: name/model and status badge */}
-                  <div class="flex items-center justify-between gap-2">
-                    <div class="min-w-0 flex-1">
-                      <p class="font-medium text-[var(--text-primary)] truncate">{printer.name || printer.serial}</p>
-                      <p class="text-sm text-[var(--text-secondary)]">{printer.model}</p>
-                    </div>
-                    <span
-                      class={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium ${stateInfo.bgColor} ${stateInfo.color}`}
-                    >
-                      {stateInfo.status}
-                    </span>
-                  </div>
-
-                  {/* Print job info when printing or paused */}
-                  {stateInfo.jobName && (
-                    <p class="mt-2 text-xs text-[var(--text-muted)] truncate" title={stateInfo.jobName}>
-                      {stateInfo.jobName}
-                    </p>
-                  )}
-
-                  {/* Progress bar when printing or paused */}
-                  {hasProgress && (
-                    <div class="mt-2">
-                      <div class="flex justify-between text-xs text-[var(--text-muted)] mb-1">
-                        <span>{stateInfo.progress}%</span>
-                        {remainingTimeStr && <span>{remainingTimeStr} left</span>}
-                      </div>
-                      <div class="h-1.5 bg-[var(--bg-secondary)] rounded-full overflow-hidden">
-                        <div
-                          class={`h-full rounded-full transition-all ${
-                            stateInfo.status === "Paused" ? "bg-yellow-500" : "bg-blue-500"
-                          }`}
-                          style={{ width: `${stateInfo.progress}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Device status & current spool */}
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Device status */}
-        <div class="card p-6">
-          <h2 class="text-lg font-semibold text-[var(--text-primary)] mb-4">SpoolBuddy Device</h2>
-          <div class="space-y-4">
-            <div class="flex items-center justify-between">
-              <span class="text-[var(--text-secondary)]">Connection</span>
-              <span
-                class={`px-3 py-1 rounded-full text-sm font-medium ${
-                  deviceConnected
-                    ? "bg-green-500/20 text-green-500"
-                    : "bg-red-500/20 text-red-500"
-                }`}
-              >
-                {deviceConnected ? "Connected" : "Disconnected"}
-              </span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-[var(--text-secondary)]">Scale Weight</span>
-              <span class="text-xl font-mono text-[var(--text-primary)]">
-                {currentWeight !== null ? (
-                  <>
-                    {Math.round(Math.max(0, currentWeight))}g
-                    {weightStable && (
-                      <span class="ml-2 text-green-500 text-sm">stable</span>
-                    )}
-                  </>
-                ) : (
-                  <span class="text-[var(--text-muted)]">--</span>
-                )}
-              </span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-[var(--text-secondary)]">NFC Tag</span>
-              <span class={`font-mono text-sm ${currentTagId ? 'text-green-500' : 'text-[var(--text-muted)]'}`}>
-                {currentTagId ? `Detected: ${currentTagId}` : 'No tag'}
-              </span>
-            </div>
-            {deviceUpdateAvailable && (
-              <div class="flex items-center justify-between pt-2 border-t border-[var(--border-color)]">
-                <span class="text-[var(--text-secondary)]">Firmware</span>
+          {/* Device status - compact visual */}
+          <div class="card p-5">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wide">Device</h2>
+              {deviceUpdateAvailable && (
                 <Link
                   href="/settings#updates"
-                  class="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
+                  class="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
                 >
-                  <Download class="w-4 h-4" />
-                  Update Available
+                  <Download class="w-3 h-3" />
+                  Update
+                </Link>
+              )}
+            </div>
+
+            <div class="space-y-3">
+              {/* Connection status */}
+              <div class="flex items-center gap-3">
+                <div class={`w-2.5 h-2.5 rounded-full ${deviceConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                <span class="text-sm text-[var(--text-secondary)]">
+                  {deviceConnected ? "Connected" : "Disconnected"}
+                </span>
+              </div>
+
+              {/* Scale weight */}
+              <div class="flex items-center justify-between p-3 bg-[var(--bg-tertiary)] rounded-lg">
+                <div class="flex items-center gap-2">
+                  <svg class="w-4 h-4 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                  </svg>
+                  <span class="text-xs text-[var(--text-muted)]">Scale</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-lg font-mono font-semibold text-[var(--text-primary)]">
+                    {currentWeight !== null ? `${Math.round(Math.max(0, currentWeight))}g` : '—'}
+                  </span>
+                  {weightStable && currentWeight !== null && (
+                    <span class="w-2 h-2 rounded-full bg-green-500" title="Stable" />
+                  )}
+                </div>
+              </div>
+
+              {/* NFC status */}
+              <div class="flex items-center justify-between p-3 bg-[var(--bg-tertiary)] rounded-lg">
+                <div class="flex items-center gap-2">
+                  <svg class="w-4 h-4 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                  <span class="text-xs text-[var(--text-muted)]">NFC</span>
+                </div>
+                <span class={`text-sm font-medium ${currentTagId ? 'text-green-500' : 'text-[var(--text-muted)]'}`}>
+                  {currentTagId ? 'Tag detected' : 'No tag'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Printers - compact list */}
+          {printers.length > 0 && (
+            <div class="card p-5">
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wide">Printers</h2>
+                <Link href="/printers" class="text-xs text-[var(--accent-color)] hover:underline">
+                  View all
                 </Link>
               </div>
-            )}
-          </div>
-        </div>
+              <div class="space-y-2">
+                {printers.map((printer) => {
+                  const stateInfo = getPrinterStateInfo(printer);
+                  const hasProgress = stateInfo.progress !== undefined && stateInfo.progress !== null;
 
-        {/* Current spool */}
-        <div class="card p-6">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-[var(--text-primary)]">Current Spool</h2>
-            {isShowingLastKnown && displayCountdown !== null && displayCountdown > 0 && (
-              <span class="text-xs text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-2 py-1 rounded-full">
-                Hiding in {displayCountdown}s
-              </span>
-            )}
-          </div>
-          {displayedSpool ? (
-            (() => {
-              // When spool is on scale, always use live scale weight (never fall back to old values)
-              // When showing last known (spool removed), use the saved last known weight
-              const grossWeight = isShowingLastKnown
-                ? (lastKnownWeight ?? lastKnownWeightRef.current ?? null)
-                : (currentWeight !== null ? Math.round(Math.max(0, currentWeight)) : null);
-              // Use spool's core_weight from inventory for remaining calculation
-              const coreWeight = displayedSpool.core_weight && displayedSpool.core_weight > 0
-                ? displayedSpool.core_weight
-                : getDefaultCoreWeight();
-              // Calculate remaining filament (gross weight - core weight)
-              const remaining = grossWeight !== null
-                ? Math.round(Math.max(0, grossWeight - coreWeight))
-                : null;
-              const labelWeight = Math.round(displayedSpool.label_weight || 1000);
-              const fillPercent = remaining !== null ? Math.min(100, Math.round((remaining / labelWeight) * 100)) : null;
+                  // Status color for left border
+                  const borderColor = stateInfo.status === "Printing" ? "border-l-blue-500"
+                    : stateInfo.status === "Paused" ? "border-l-yellow-500"
+                    : stateInfo.status === "Idle" ? "border-l-green-500"
+                    : stateInfo.status === "Offline" ? "border-l-gray-500"
+                    : "border-l-green-500";
 
-              return (
-                <div class="flex flex-col items-center text-center space-y-4">
-                  {/* Spool header with color */}
-                  <div class="flex flex-col items-center space-y-2">
-                    <SpoolIcon
-                      color={displayedSpool.rgba ? `#${displayedSpool.rgba.slice(0, 6)}` : '#808080'}
-                      isEmpty={false}
-                      size={64}
-                    />
-                    <div>
-                      <p class="font-medium text-[var(--text-primary)]">
-                        {displayedSpool.color_name || "Unknown color"}
-                      </p>
-                      <p class="text-sm text-[var(--text-secondary)]">
-                        {displayedSpool.brand} {displayedSpool.material}
-                        {displayedSpool.subtype && ` ${displayedSpool.subtype}`}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Scale weight display */}
-                  {grossWeight !== null && (
-                    <div class="w-full max-w-xs">
-                      <div class="text-center mb-2">
-                        <span class="text-2xl font-mono text-[var(--text-primary)]">{grossWeight}g</span>
-                        <span class="text-sm text-[var(--text-muted)] ml-2">scale weight</span>
-                      </div>
-                      {/* Fill level bar */}
-                      {fillPercent !== null && (
-                        <>
-                          <div class="flex justify-between text-xs text-[var(--text-muted)] mb-1">
-                            <span>Fill Level</span>
-                            <span>{fillPercent}%</span>
-                          </div>
-                          <div class="h-3 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
-                            <div
-                              class={`h-full rounded-full transition-all ${
-                                fillPercent > 50 ? 'bg-green-500' : fillPercent > 20 ? 'bg-yellow-500' : 'bg-red-500'
-                              }`}
-                              style={{ width: `${fillPercent}%` }}
-                            />
-                          </div>
-                          <div class="flex justify-between text-xs text-[var(--text-muted)] mt-1">
-                            <span>{remaining}g filament</span>
-                            <span>of {labelWeight}g</span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  {displayedSpool.location && (
-                    <p class="text-sm text-[var(--text-secondary)]">
-                      <span class="text-[var(--text-muted)]">Location:</span> {displayedSpool.location}
-                    </p>
-                  )}
-
-                  {/* Action buttons for spool in inventory */}
-                  <div class="flex flex-col sm:flex-row gap-2 w-full max-w-xs">
-                    <button
-                      onClick={() => {
-                        setAssignModalSpool(displayedSpool);
-                        setShowAssignModal(true);
-                      }}
-                      class="btn btn-primary flex-1 justify-center"
-                    >
-                      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
-                      </svg>
-                      Assign to AMS
-                    </button>
+                  return (
                     <Link
-                      href={`/inventory?edit=${displayedSpool.id}`}
-                      class="btn flex-1 justify-center"
+                      key={printer.serial}
+                      href="/printers"
+                      class={`block p-3 bg-[var(--bg-tertiary)] rounded-lg border-l-3 ${borderColor} hover:bg-[var(--border-color)] transition-all hover:translate-x-0.5`}
                     >
-                      Edit Details
+                      <div class="flex items-center justify-between gap-2">
+                        <div class="min-w-0 flex-1">
+                          <p class="text-sm font-medium text-[var(--text-primary)] truncate">{printer.name || printer.serial}</p>
+                          {hasProgress ? (
+                            <div class="flex items-center gap-2 mt-1">
+                              <div class="flex-1 h-1 bg-[var(--bg-secondary)] rounded-full overflow-hidden">
+                                <div
+                                  class={`h-full rounded-full ${stateInfo.status === "Paused" ? "bg-yellow-500" : "bg-blue-500"}`}
+                                  style={{ width: `${stateInfo.progress}%` }}
+                                />
+                              </div>
+                              <span class="text-xs text-[var(--text-muted)]">{stateInfo.progress}%</span>
+                            </div>
+                          ) : (
+                            <p class="text-xs text-[var(--text-muted)]">{stateInfo.status}</p>
+                          )}
+                        </div>
+                      </div>
                     </Link>
-                  </div>
-                </div>
-              );
-            })()
-          ) : currentTagId ? (
-            // Tag detected but spool NOT in inventory (only show when actual tag present)
-            (() => {
-              // For unknown spools, estimate remaining using default core weight
-              const defaultCoreWeight = getDefaultCoreWeight();
-              const grossWeight = currentWeight !== null ? Math.round(Math.max(0, currentWeight)) : null;
-              const estimatedRemaining = grossWeight !== null
-                ? Math.round(Math.max(0, grossWeight - defaultCoreWeight))
-                : null;
-
-              return (
-                <div class="flex flex-col items-center justify-center py-6 text-center space-y-4">
-                  <div class="w-16 h-16 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center">
-                    <svg class="w-8 h-8 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p class="font-medium text-[var(--text-primary)]">New Spool Detected</p>
-                    <p class="text-sm text-[var(--text-muted)]">Tag ID: {currentTagId}</p>
-                  </div>
-                  {grossWeight !== null && (
-                    <div class="text-sm text-[var(--text-secondary)]">
-                      <p>Scale: {grossWeight}g</p>
-                      {estimatedRemaining !== null && estimatedRemaining > 0 && (
-                        <p class="text-[var(--text-muted)]">~{estimatedRemaining}g filament (estimated)</p>
-                      )}
-                    </div>
-                  )}
-                  <p class="text-sm text-[var(--text-secondary)]">
-                    This spool is not in your inventory yet.
-                  </p>
-                  <Link
-                    href={`/inventory?add=true&tagId=${encodeURIComponent(currentTagId)}${currentWeight !== null ? `&weight=${Math.round(Math.max(0, currentWeight))}` : ''}`}
-                    class="btn btn-primary"
-                  >
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    Add to Inventory
-                  </Link>
-                </div>
-              );
-            })()
-          ) : (
-            // No tag detected
-            <div class="flex flex-col items-center justify-center py-8 text-center">
-              <div class="mb-4">
-                <SpoolIcon color="#808080" isEmpty={true} size={64} />
+                  );
+                })}
               </div>
-              <p class="text-[var(--text-muted)]">
-                Place a spool on the scale to identify it
-              </p>
             </div>
           )}
         </div>
-      </div>
 
-      {/* Quick actions */}
-      <div class="card p-6">
-        <h2 class="text-lg font-semibold text-[var(--text-primary)] mb-4">Quick Actions</h2>
-        <div class="flex flex-wrap gap-4">
-          <Link
-            href="/inventory"
-            class="btn btn-primary"
-          >
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Add Spool
-          </Link>
-          <Link
-            href="/printers"
-            class="btn"
-          >
-            <svg class="w-5 h-5 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-            </svg>
-            Manage Printers
-          </Link>
+        {/* Right column: Current Spool - HERO */}
+        <div class="lg:col-span-2">
+          <div class="card p-6 h-full">
+            <div class="flex items-center justify-between mb-6">
+              <h2 class="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wide">Current Spool</h2>
+              {isShowingLastKnown && displayCountdown !== null && displayCountdown > 0 && (
+                <span class="text-xs text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-2.5 py-1 rounded-full">
+                  {displayCountdown}s
+                </span>
+              )}
+            </div>
+
+            {displayedSpool ? (
+              (() => {
+                const grossWeight = isShowingLastKnown
+                  ? (lastKnownWeight ?? lastKnownWeightRef.current ?? null)
+                  : (currentWeight !== null ? Math.round(Math.max(0, currentWeight)) : null);
+                const coreWeight = displayedSpool.core_weight && displayedSpool.core_weight > 0
+                  ? displayedSpool.core_weight
+                  : getDefaultCoreWeight();
+                const remaining = grossWeight !== null
+                  ? Math.round(Math.max(0, grossWeight - coreWeight))
+                  : null;
+                const labelWeight = Math.round(displayedSpool.label_weight || 1000);
+                const fillPercent = remaining !== null ? Math.min(100, Math.round((remaining / labelWeight) * 100)) : null;
+                const fillColor = fillPercent !== null
+                  ? fillPercent > 50 ? '#22c55e' : fillPercent > 20 ? '#eab308' : '#ef4444'
+                  : '#808080';
+
+                return (
+                  <div class="flex flex-col lg:flex-row items-center gap-8">
+                    {/* Left: Large spool visualization */}
+                    <div class="flex flex-col items-center">
+                      <div class="relative">
+                        <SpoolIcon
+                          color={displayedSpool.rgba ? `#${displayedSpool.rgba.slice(0, 6)}` : '#808080'}
+                          isEmpty={false}
+                          size={120}
+                        />
+                        {/* Fill percentage badge */}
+                        {fillPercent !== null && (
+                          <div
+                            class="absolute -bottom-2 -right-2 px-2.5 py-1 rounded-full text-xs font-bold text-white shadow-lg"
+                            style={{ backgroundColor: fillColor }}
+                          >
+                            {fillPercent}%
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right: Spool details */}
+                    <div class="flex-1 text-center lg:text-left space-y-4">
+                      {/* Name and type */}
+                      <div>
+                        <h3 class="text-xl font-semibold text-[var(--text-primary)]">
+                          {displayedSpool.color_name || "Unknown color"}
+                        </h3>
+                        <p class="text-sm text-[var(--text-secondary)]">
+                          {displayedSpool.brand} • {displayedSpool.material}
+                          {displayedSpool.subtype && ` ${displayedSpool.subtype}`}
+                        </p>
+                      </div>
+
+                      {/* Weight info */}
+                      {grossWeight !== null && (
+                        <div class="space-y-3">
+                          <div class="flex items-baseline gap-2 justify-center lg:justify-start">
+                            <span class="text-4xl font-bold font-mono text-[var(--text-primary)]">{remaining}g</span>
+                            <span class="text-sm text-[var(--text-muted)]">of {labelWeight}g</span>
+                          </div>
+
+                          {/* Fill bar */}
+                          <div class="max-w-sm mx-auto lg:mx-0">
+                            <div class="h-2.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
+                              <div
+                                class="h-full rounded-full transition-all duration-500"
+                                style={{ width: `${fillPercent}%`, backgroundColor: fillColor }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {displayedSpool.location && (
+                        <p class="text-sm text-[var(--text-muted)]">
+                          📍 {displayedSpool.location}
+                        </p>
+                      )}
+
+                      {/* Action buttons */}
+                      <div class="flex flex-wrap gap-2 justify-center lg:justify-start pt-2">
+                        <button
+                          onClick={() => {
+                            setAssignModalSpool(displayedSpool);
+                            setShowAssignModal(true);
+                          }}
+                          class="btn btn-primary"
+                        >
+                          Assign to AMS
+                        </button>
+                        <Link
+                          href={`/inventory?edit=${displayedSpool.id}`}
+                          class="btn btn-secondary"
+                        >
+                          Edit
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()
+            ) : currentTagId ? (
+              // New spool detected
+              (() => {
+                const defaultCoreWeight = getDefaultCoreWeight();
+                const grossWeight = currentWeight !== null ? Math.round(Math.max(0, currentWeight)) : null;
+                const estimatedRemaining = grossWeight !== null
+                  ? Math.round(Math.max(0, grossWeight - defaultCoreWeight))
+                  : null;
+
+                return (
+                  <div class="flex flex-col items-center justify-center py-8 text-center space-y-5">
+                    <div class="w-20 h-20 rounded-2xl bg-[var(--accent-color)]/15 flex items-center justify-center">
+                      <svg class="w-10 h-10 text-[var(--accent-color)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 class="text-lg font-semibold text-[var(--text-primary)]">New Spool Detected</h3>
+                      <p class="text-sm text-[var(--text-muted)] font-mono mt-1">{currentTagId}</p>
+                    </div>
+                    {grossWeight !== null && (
+                      <div class="text-sm text-[var(--text-secondary)]">
+                        <span class="font-mono font-semibold">{grossWeight}g</span> on scale
+                        {estimatedRemaining !== null && estimatedRemaining > 0 && (
+                          <span class="text-[var(--text-muted)]"> • ~{estimatedRemaining}g filament</span>
+                        )}
+                      </div>
+                    )}
+                    <Link
+                      href={`/inventory?add=true&tagId=${encodeURIComponent(currentTagId)}${currentWeight !== null ? `&weight=${Math.round(Math.max(0, currentWeight))}` : ''}`}
+                      class="btn btn-primary"
+                    >
+                      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      Add to Inventory
+                    </Link>
+                  </div>
+                );
+              })()
+            ) : (
+              // No tag - empty state
+              <div class="flex flex-col items-center justify-center py-12 text-center">
+                <div class="mb-6 opacity-40">
+                  <SpoolIcon color="#808080" isEmpty={true} size={100} />
+                </div>
+                <p class="text-[var(--text-muted)] text-sm">
+                  Place a spool on the scale to identify it
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

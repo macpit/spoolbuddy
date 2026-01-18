@@ -305,6 +305,11 @@
   box-shadow: var(--card-shadow);
 }
 
+/* Custom utilities */
+.border-l-3 {
+  border-left-width: 3px;
+}
+
 /* Custom scrollbar for webkit browsers */
 ::-webkit-scrollbar {
   width: 8px;

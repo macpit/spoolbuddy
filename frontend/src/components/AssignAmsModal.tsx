@@ -23,25 +23,49 @@ function getAmsName(amsId: number): string {
   return `AMS ${amsId}`;
 }
 
-// Check if printer model supports dual extruders
-function isDualExtruder(model: string | null): boolean {
-  if (!model) return false;
-  const m = model.toUpperCase();
-  return m.includes('H2D') || m.includes('H2C');
+// Check if printer is dual-nozzle from state
+// Detection priority:
+// 1. nozzle_count field (set by backend when extruder_info has 2+ entries)
+// 2. tray_now_left set (only dual-nozzle printers have left nozzle)
+// 3. Multiple AMS units with extruder assignments
+function isDualNozzle(state: PrinterState | undefined): boolean {
+  if (!state) return false;
+
+  // Primary check: nozzle_count from backend (most reliable)
+  if (state.nozzle_count === 2) {
+    console.log('[isDualNozzle] Detected via nozzle_count=2');
+    return true;
+  }
+
+  // Fallback: check if tray_now_left is set (only dual-nozzle has left nozzle)
+  if (typeof state.tray_now_left === 'number') {
+    console.log('[isDualNozzle] Detected via tray_now_left:', state.tray_now_left);
+    return true;
+  }
+
+  // Fallback: check if multiple AMS units have extruder assignments
+  const unitsWithExtruder = state.ams_units?.filter(u => typeof u.extruder === 'number') || [];
+  if (unitsWithExtruder.length >= 2) {
+    console.log('[isDualNozzle] Detected via unitsWithExtruder:', unitsWithExtruder.length);
+    return true;
+  }
+
+  console.log('[isDualNozzle] Not dual-nozzle. nozzle_count:', state.nozzle_count, 'tray_now_left:', state.tray_now_left, 'unitsWithExtruder:', unitsWithExtruder.length);
+  return false;
 }
 
 // Build list of all AMS units including external slots
 function buildAmsUnitsWithExternal(
-  state: PrinterState | undefined,
-  printerModel: string | null
+  state: PrinterState | undefined
 ): AmsUnit[] {
   const units: AmsUnit[] = [...(state?.ams_units || [])];
+  const dualNozzle = isDualNozzle(state);
 
   // Check if external slots already exist in ams_units
   const hasExternal = units.some(u => u.id === 255);
   const hasExternalLeft = units.some(u => u.id === 254);
 
-  if (isDualExtruder(printerModel)) {
+  if (dualNozzle) {
     // Dual extruder: add Ext-L (254) and Ext-R (255) if not present
     if (!hasExternalLeft) {
       units.push({
@@ -129,6 +153,7 @@ function SlotButton({
   isSelected,
   onClick,
   disabled,
+  hideSlotName,
 }: {
   tray: AmsTray | null;
   amsId: number;
@@ -136,6 +161,7 @@ function SlotButton({
   isSelected: boolean;
   onClick: () => void;
   disabled?: boolean;
+  hideSlotName?: boolean;
 }) {
   const isEmpty = !tray || isTrayEmpty(tray);
   const color = tray ? trayColorToCSS(tray.tray_color) : "#808080";
@@ -150,27 +176,29 @@ function SlotButton({
           ? "border-[var(--accent-color)] bg-[var(--accent-color)]/10"
           : disabled
             ? "border-[var(--border-color)] bg-[var(--bg-tertiary)] opacity-50 cursor-not-allowed"
-            : "border-[var(--border-color)] hover:border-[var(--text-muted)] bg-[var(--bg-tertiary)]"
+            : "border-[var(--border-color)] hover:border-[var(--accent-color)]/50 hover:bg-[var(--bg-tertiary)] bg-[var(--bg-secondary)]"
       }`}
     >
       {/* Spool icon */}
       <div
-        class={`w-10 h-10 rounded-full flex items-center justify-center ${
-          isEmpty ? "border-2 border-dashed border-[var(--text-muted)]" : ""
+        class={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm ${
+          isEmpty ? "border-2 border-dashed border-[var(--text-muted)]/50" : ""
         }`}
         style={!isEmpty ? { backgroundColor: color } : {}}
       >
-        {isEmpty && <div class="w-2 h-2 rounded-full bg-[var(--text-muted)]" />}
+        {isEmpty && <div class="w-2 h-2 rounded-full bg-[var(--text-muted)]/50" />}
       </div>
       {/* Slot name */}
-      <span class="text-xs mt-1 text-[var(--text-secondary)]">{slotName}</span>
+      {!hideSlotName && (
+        <span class={`text-xs font-medium mt-1 ${isSelected ? 'text-[var(--accent-color)]' : 'text-[var(--text-primary)]'}`}>{slotName}</span>
+      )}
       {/* Material type */}
       <span class="text-[10px] text-[var(--text-muted)] truncate max-w-[50px]">
         {isEmpty ? "Empty" : tray?.tray_type || ""}
       </span>
       {/* Selection indicator */}
       {isSelected && (
-        <div class="absolute -top-1 -right-1 w-4 h-4 bg-[var(--accent-color)] rounded-full flex items-center justify-center">
+        <div class="absolute -top-1 -right-1 w-4 h-4 bg-[var(--accent-color)] rounded-full flex items-center justify-center shadow-sm">
           <svg class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
           </svg>
@@ -188,6 +216,7 @@ function AmsUnitDisplay({
   onSelectSlot,
   readingSlot,
   isWaiting,
+  dualNozzle,
 }: {
   unit: AmsUnit;
   printerSerial: string;
@@ -195,6 +224,7 @@ function AmsUnitDisplay({
   onSelectSlot: (serial: string, amsId: number, trayId: number) => void;
   readingSlot: { serial: string; amsId: number; trayId: number } | null;
   isWaiting: boolean;
+  dualNozzle: boolean;
 }) {
   const amsName = getAmsName(unit.id);
   const isHt = unit.id >= 128 && unit.id <= 135;
@@ -210,7 +240,7 @@ function AmsUnitDisplay({
     }
   });
 
-  // For single-slot units, use inline layout
+  // For single-slot units (HT-*, External), show in same container but 1/4 width
   if (isSingleSlot) {
     const tray = slots[0];
     const isSelected = selectedSlot?.serial === printerSerial &&
@@ -220,9 +250,12 @@ function AmsUnitDisplay({
       readingSlot?.amsId === unit.id &&
       readingSlot?.trayId === 0;
 
+    // For external slots: show "Ext" for single-nozzle, "Ext-L"/"Ext-R" for dual-nozzle
+    const slotName = isExternal && !dualNozzle ? "Ext" : getSlotName(unit.id, 0);
+
     return (
-      <div class="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-2 flex items-center gap-2 w-fit">
-        <span class="text-xs font-medium text-[var(--text-secondary)] min-w-[50px]">{amsName}</span>
+      <div class="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-3 w-fit">
+        <div class="text-sm font-medium text-[var(--text-primary)] mb-2 whitespace-nowrap">{slotName}</div>
         <div class="relative">
           <SlotButton
             tray={tray}
@@ -231,6 +264,7 @@ function AmsUnitDisplay({
             isSelected={isSelected}
             onClick={() => !isWaiting && onSelectSlot(printerSerial, unit.id, 0)}
             disabled={isWaiting}
+            hideSlotName
           />
           {isThisSlotReading && (
             <div class="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
@@ -616,7 +650,12 @@ export function AssignAmsModal({ isOpen, onClose, spool }: AssignAmsModalProps) 
             <div class="space-y-6">
               {connectedPrinters.map((printer) => {
                 const state = printerStates.get(printer.serial);
-                const amsUnits = buildAmsUnitsWithExternal(state, printer.model);
+                const dualNozzle = isDualNozzle(state);
+                const amsUnits = buildAmsUnitsWithExternal(state);
+
+                // Separate regular AMS units from single-slot units
+                const regularUnits = amsUnits.filter(u => u.id <= 3);
+                const singleSlotUnits = amsUnits.filter(u => u.id > 3);
 
                 return (
                   <div key={printer.serial} class="space-y-3">
@@ -624,21 +663,44 @@ export function AssignAmsModal({ isOpen, onClose, spool }: AssignAmsModalProps) 
                       {printer.name || printer.serial}
                       {printer.model && <span class="ml-2 text-xs text-[var(--text-muted)]">({printer.model})</span>}
                     </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {amsUnits.map((unit) => (
-                        <AmsUnitDisplay
-                          key={`${printer.serial}-${unit.id}`}
-                          unit={unit}
-                          printerSerial={printer.serial}
-                          selectedSlot={selectedSlot}
-                          onSelectSlot={(serial, amsId, trayId) =>
-                            setSelectedSlot({ serial, amsId, trayId })
-                          }
-                          readingSlot={readingSlot}
-                          isWaiting={waitingForSlotRef.current !== null}
-                        />
-                      ))}
-                    </div>
+                    {/* Regular AMS units in grid */}
+                    {regularUnits.length > 0 && (
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {regularUnits.map((unit) => (
+                          <AmsUnitDisplay
+                            key={`${printer.serial}-${unit.id}`}
+                            unit={unit}
+                            printerSerial={printer.serial}
+                            selectedSlot={selectedSlot}
+                            onSelectSlot={(serial, amsId, trayId) =>
+                              setSelectedSlot({ serial, amsId, trayId })
+                            }
+                            readingSlot={readingSlot}
+                            isWaiting={waitingForSlotRef.current !== null}
+                            dualNozzle={dualNozzle}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {/* Single-slot units (HT-*, External) in flex row */}
+                    {singleSlotUnits.length > 0 && (
+                      <div class="flex flex-wrap gap-3">
+                        {singleSlotUnits.map((unit) => (
+                          <AmsUnitDisplay
+                            key={`${printer.serial}-${unit.id}`}
+                            unit={unit}
+                            printerSerial={printer.serial}
+                            selectedSlot={selectedSlot}
+                            onSelectSlot={(serial, amsId, trayId) =>
+                              setSelectedSlot({ serial, amsId, trayId })
+                            }
+                            readingSlot={readingSlot}
+                            isWaiting={waitingForSlotRef.current !== null}
+                            dualNozzle={dualNozzle}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
