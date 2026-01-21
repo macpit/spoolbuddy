@@ -105,6 +105,18 @@ CREATE TABLE IF NOT EXISTS spool_catalog (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_spool_catalog_name ON spool_catalog(name);
 
+-- Color catalog (filament colors by manufacturer/material)
+CREATE TABLE IF NOT EXISTS color_catalog (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    manufacturer TEXT NOT NULL,
+    color_name TEXT NOT NULL,
+    hex_color TEXT NOT NULL,
+    material TEXT,
+    is_default INTEGER DEFAULT 1,
+    created_at INTEGER DEFAULT (strftime('%s', 'now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_color_catalog_unique ON color_catalog(manufacturer, color_name, material);
+
 -- AMS sensor history (for humidity/temperature graphs)
 CREATE TABLE IF NOT EXISTS ams_sensor_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -220,6 +232,154 @@ DEFAULT_SPOOL_CATALOG = [
     ("ZYLtech - Plastic", 179),
 ]
 
+# Default color catalog data (manufacturer, color_name, hex_color, material)
+# Sources: Bambu Lab official hex code PDFs, filamentcolors.xyz
+DEFAULT_COLOR_CATALOG = [
+    # Bambu Lab PLA Basic
+    ("Bambu Lab", "Jade White", "#FFFFFF", "PLA Basic"),
+    ("Bambu Lab", "Black", "#000000", "PLA Basic"),
+    ("Bambu Lab", "Silver", "#A6A9AA", "PLA Basic"),
+    ("Bambu Lab", "Light Gray", "#C0C0C0", "PLA Basic"),
+    ("Bambu Lab", "Gray", "#8E9089", "PLA Basic"),
+    ("Bambu Lab", "Dark Gray", "#616364", "PLA Basic"),
+    ("Bambu Lab", "Red", "#C12E1F", "PLA Basic"),
+    ("Bambu Lab", "Magenta", "#EC008C", "PLA Basic"),
+    ("Bambu Lab", "Hot Pink", "#FF69B4", "PLA Basic"),
+    ("Bambu Lab", "Pink", "#F55A74", "PLA Basic"),
+    ("Bambu Lab", "Beige", "#F7E6DE", "PLA Basic"),
+    ("Bambu Lab", "Yellow", "#FFFF00", "PLA Basic"),
+    ("Bambu Lab", "Sunflower Yellow", "#FEC600", "PLA Basic"),
+    ("Bambu Lab", "Gold", "#E4BD68", "PLA Basic"),
+    ("Bambu Lab", "Orange", "#FF8C00", "PLA Basic"),
+    ("Bambu Lab", "Pumpkin Orange", "#FF9016", "PLA Basic"),
+    ("Bambu Lab", "Bright Green", "#66FF00", "PLA Basic"),
+    ("Bambu Lab", "Bambu Green", "#00AE42", "PLA Basic"),
+    ("Bambu Lab", "Mistletoe Green", "#3F8E43", "PLA Basic"),
+    ("Bambu Lab", "Turquoise", "#00B1B7", "PLA Basic"),
+    ("Bambu Lab", "Cyan", "#0086D6", "PLA Basic"),
+    ("Bambu Lab", "Blue", "#0A2989", "PLA Basic"),
+    ("Bambu Lab", "Blue Grey", "#647988", "PLA Basic"),
+    ("Bambu Lab", "Cobalt Blue", "#0047AB", "PLA Basic"),
+    ("Bambu Lab", "Purple", "#5E43B7", "PLA Basic"),
+    ("Bambu Lab", "Indigo Purple", "#482960", "PLA Basic"),
+    ("Bambu Lab", "Brown", "#9D432C", "PLA Basic"),
+    ("Bambu Lab", "Cocoa Brown", "#5C4033", "PLA Basic"),
+    ("Bambu Lab", "Bronze", "#847D48", "PLA Basic"),
+    # Bambu Lab PLA Matte
+    ("Bambu Lab", "Ivory White", "#EBEBE3", "PLA Matte"),
+    ("Bambu Lab", "Bone White", "#F5F5DC", "PLA Matte"),
+    ("Bambu Lab", "Lemon Yellow", "#FFF44F", "PLA Matte"),
+    ("Bambu Lab", "Mandarin Orange", "#FF7518", "PLA Matte"),
+    ("Bambu Lab", "Scarlet Red", "#FF2400", "PLA Matte"),
+    ("Bambu Lab", "Lilac Purple", "#C8A2C8", "PLA Matte"),
+    ("Bambu Lab", "Grape Purple", "#6F2DA8", "PLA Matte"),
+    ("Bambu Lab", "Grass Green", "#6BB173", "PLA Matte"),
+    ("Bambu Lab", "Dark Green", "#656A4D", "PLA Matte"),
+    ("Bambu Lab", "Sakura Pink", "#EAB8CA", "PLA Matte"),
+    ("Bambu Lab", "Charcoal", "#36454F", "PLA Matte"),
+    # Bambu Lab PLA Silk
+    ("Bambu Lab", "Blue", "#4F9CCC", "PLA Silk"),
+    ("Bambu Lab", "Gold", "#CFB53B", "PLA Silk"),
+    ("Bambu Lab", "Silver", "#C0C0C0", "PLA Silk"),
+    ("Bambu Lab", "Copper", "#B87333", "PLA Silk"),
+    ("Bambu Lab", "Green", "#50C878", "PLA Silk"),
+    ("Bambu Lab", "Red", "#DC143C", "PLA Silk"),
+    # Bambu Lab PLA Sparkle
+    ("Bambu Lab", "Alpine Green Sparkle", "#4F6359", "PLA Sparkle"),
+    ("Bambu Lab", "Galaxy Black Sparkle", "#1C1C1C", "PLA Sparkle"),
+    ("Bambu Lab", "Space Gray Sparkle", "#4A4A4A", "PLA Sparkle"),
+    # Bambu Lab PETG Basic
+    ("Bambu Lab", "Black", "#000000", "PETG Basic"),
+    ("Bambu Lab", "White", "#FFFFFF", "PETG Basic"),
+    ("Bambu Lab", "Gray", "#808080", "PETG Basic"),
+    ("Bambu Lab", "Translucent", "#F0F0F0", "PETG Basic"),
+    # Bambu Lab PETG-HF
+    ("Bambu Lab", "White", "#F0F1F0", "PETG-HF"),
+    ("Bambu Lab", "Black", "#000000", "PETG-HF"),
+    ("Bambu Lab", "Gray", "#A3A6A6", "PETG-HF"),
+    ("Bambu Lab", "Red", "#C33F45", "PETG-HF"),
+    ("Bambu Lab", "Orange", "#FF7146", "PETG-HF"),
+    ("Bambu Lab", "Blue", "#1E90FF", "PETG-HF"),
+    ("Bambu Lab", "Translucent Orange", "#EF8E5B", "PETG-HF"),
+    # Bambu Lab ABS
+    ("Bambu Lab", "Black", "#000000", "ABS"),
+    ("Bambu Lab", "White", "#FFFFFF", "ABS"),
+    ("Bambu Lab", "Gray", "#808080", "ABS"),
+    ("Bambu Lab", "Red", "#FF0000", "ABS"),
+    # Bambu Lab ASA
+    ("Bambu Lab", "Black", "#000000", "ASA"),
+    ("Bambu Lab", "White", "#FFFFFF", "ASA"),
+    ("Bambu Lab", "Gray", "#808080", "ASA"),
+    # Bambu Lab TPU
+    ("Bambu Lab", "White", "#F0EFE3", "TPU 95A"),
+    ("Bambu Lab", "Black", "#000000", "TPU 95A"),
+    ("Bambu Lab", "Gray", "#8C9091", "TPU 95A"),
+    ("Bambu Lab", "Red", "#FF0000", "TPU 95A"),
+    # Bambu Lab PLA-CF / PAHT-CF / PETG-CF
+    ("Bambu Lab", "Black", "#1A1A1A", "PLA-CF"),
+    ("Bambu Lab", "Black", "#1A1A1A", "PAHT-CF"),
+    ("Bambu Lab", "Black", "#1A1A1A", "PETG-CF"),
+    # Bambu Lab Support Materials
+    ("Bambu Lab", "Natural", "#F5F5DC", "PLA Support"),
+    ("Bambu Lab", "Natural", "#F5F5DC", "PVA Support"),
+    # Polymaker PolyTerra PLA (popular brand)
+    ("Polymaker", "Cotton White", "#F5F5F5", "PolyTerra PLA"),
+    ("Polymaker", "Charcoal Black", "#2B2B2B", "PolyTerra PLA"),
+    ("Polymaker", "Marble White", "#E8E8E8", "PolyTerra PLA"),
+    ("Polymaker", "Fossil Grey", "#6B6B6B", "PolyTerra PLA"),
+    ("Polymaker", "Shadow Black", "#1A1A1A", "PolyTerra PLA"),
+    ("Polymaker", "Army Red", "#8B0000", "PolyTerra PLA"),
+    ("Polymaker", "Lava Red", "#CF1020", "PolyTerra PLA"),
+    ("Polymaker", "Sakura Pink", "#FFB7C5", "PolyTerra PLA"),
+    ("Polymaker", "Rose", "#FF007F", "PolyTerra PLA"),
+    ("Polymaker", "Peach", "#FFCBA4", "PolyTerra PLA"),
+    ("Polymaker", "Banana", "#FFE135", "PolyTerra PLA"),
+    ("Polymaker", "Savannah Yellow", "#F4C430", "PolyTerra PLA"),
+    ("Polymaker", "Sunrise Orange", "#FF6600", "PolyTerra PLA"),
+    ("Polymaker", "Muted Green", "#4F7942", "PolyTerra PLA"),
+    ("Polymaker", "Forest Green", "#228B22", "PolyTerra PLA"),
+    ("Polymaker", "Mint", "#98FF98", "PolyTerra PLA"),
+    ("Polymaker", "Lavender Purple", "#B57EDC", "PolyTerra PLA"),
+    ("Polymaker", "Sapphire Blue", "#0F52BA", "PolyTerra PLA"),
+    ("Polymaker", "Ice", "#D6ECEF", "PolyTerra PLA"),
+    # Prusament PLA
+    ("Prusament", "Jet Black", "#1A1A1A", "PLA"),
+    ("Prusament", "Galaxy Black", "#1F1F1F", "PLA"),
+    ("Prusament", "Pristine White", "#FFFFFF", "PLA"),
+    ("Prusament", "Gentleman's Grey", "#5A5A5A", "PLA"),
+    ("Prusament", "Lipstick Red", "#C21E1E", "PLA"),
+    ("Prusament", "Orange", "#FF6600", "PLA"),
+    ("Prusament", "Pineapple Yellow", "#FFD700", "PLA"),
+    ("Prusament", "Jungle Green", "#29AB87", "PLA"),
+    ("Prusament", "Azure Blue", "#007FFF", "PLA"),
+    ("Prusament", "Royal Blue", "#4169E1", "PLA"),
+    ("Prusament", "Mystic Purple", "#7B68EE", "PLA"),
+    # eSUN PLA+
+    ("eSUN", "White", "#FFFFFF", "PLA+"),
+    ("eSUN", "Black", "#000000", "PLA+"),
+    ("eSUN", "Grey", "#808080", "PLA+"),
+    ("eSUN", "Red", "#FF0000", "PLA+"),
+    ("eSUN", "Blue", "#0000FF", "PLA+"),
+    ("eSUN", "Green", "#00FF00", "PLA+"),
+    ("eSUN", "Yellow", "#FFFF00", "PLA+"),
+    ("eSUN", "Orange", "#FFA500", "PLA+"),
+    ("eSUN", "Purple", "#800080", "PLA+"),
+    ("eSUN", "Pink", "#FFC0CB", "PLA+"),
+    # Hatchbox PLA
+    ("Hatchbox", "White", "#FFFFFF", "PLA"),
+    ("Hatchbox", "Black", "#000000", "PLA"),
+    ("Hatchbox", "Gray", "#808080", "PLA"),
+    ("Hatchbox", "Red", "#FF0000", "PLA"),
+    ("Hatchbox", "Blue", "#0000FF", "PLA"),
+    ("Hatchbox", "Green", "#00FF00", "PLA"),
+    ("Hatchbox", "Yellow", "#FFFF00", "PLA"),
+    ("Hatchbox", "Orange", "#FFA500", "PLA"),
+    ("Hatchbox", "Purple", "#800080", "PLA"),
+    ("Hatchbox", "Pink", "#FFC0CB", "PLA"),
+    ("Hatchbox", "True Blue", "#0073CF", "PLA"),
+    ("Hatchbox", "True Green", "#008000", "PLA"),
+]
+
 
 class Database:
     """Async SQLite database wrapper."""
@@ -240,6 +400,9 @@ class Database:
 
         # Seed spool catalog with defaults if empty
         await self.seed_spool_catalog()
+
+        # Seed color catalog with defaults if empty
+        await self.seed_color_catalog()
 
     async def _run_migrations(self):
         """Run database migrations for new columns."""
@@ -844,6 +1007,95 @@ class Database:
                 "INSERT INTO spool_catalog (name, weight, is_default) VALUES (?, ?, 1)", (name, weight)
             )
         await self.conn.commit()
+
+    # ============ Color Catalog Operations ============
+
+    async def seed_color_catalog(self) -> None:
+        """Seed the color catalog with default entries if empty."""
+        async with self.conn.execute("SELECT COUNT(*) FROM color_catalog") as cursor:
+            row = await cursor.fetchone()
+            if row[0] > 0:
+                return  # Already has data
+
+        for manufacturer, color_name, hex_color, material in DEFAULT_COLOR_CATALOG:
+            await self.conn.execute(
+                "INSERT OR IGNORE INTO color_catalog (manufacturer, color_name, hex_color, material, is_default) VALUES (?, ?, ?, ?, 1)",
+                (manufacturer, color_name, hex_color, material),
+            )
+        await self.conn.commit()
+
+    async def get_color_catalog(self) -> list[dict]:
+        """Get all color catalog entries."""
+        async with self.conn.execute(
+            "SELECT id, manufacturer, color_name, hex_color, material, is_default, created_at FROM color_catalog ORDER BY manufacturer, material, color_name"
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    async def add_color_catalog_entry(
+        self, manufacturer: str, color_name: str, hex_color: str, material: str | None
+    ) -> dict:
+        """Add a new color catalog entry."""
+        cursor = await self.conn.execute(
+            "INSERT INTO color_catalog (manufacturer, color_name, hex_color, material, is_default) VALUES (?, ?, ?, ?, 0)",
+            (manufacturer, color_name, hex_color, material),
+        )
+        await self.conn.commit()
+        async with self.conn.execute(
+            "SELECT id, manufacturer, color_name, hex_color, material, is_default, created_at FROM color_catalog WHERE id = ?",
+            (cursor.lastrowid,),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return dict(row) if row else {}
+
+    async def update_color_catalog_entry(
+        self, entry_id: int, manufacturer: str, color_name: str, hex_color: str, material: str | None
+    ) -> dict | None:
+        """Update a color catalog entry."""
+        await self.conn.execute(
+            "UPDATE color_catalog SET manufacturer = ?, color_name = ?, hex_color = ?, material = ? WHERE id = ?",
+            (manufacturer, color_name, hex_color, material, entry_id),
+        )
+        await self.conn.commit()
+        async with self.conn.execute(
+            "SELECT id, manufacturer, color_name, hex_color, material, is_default, created_at FROM color_catalog WHERE id = ?",
+            (entry_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+    async def delete_color_catalog_entry(self, entry_id: int) -> bool:
+        """Delete a color catalog entry."""
+        cursor = await self.conn.execute("DELETE FROM color_catalog WHERE id = ?", (entry_id,))
+        await self.conn.commit()
+        return cursor.rowcount > 0
+
+    async def reset_color_catalog(self) -> None:
+        """Reset color catalog to defaults."""
+        await self.conn.execute("DELETE FROM color_catalog")
+        for manufacturer, color_name, hex_color, material in DEFAULT_COLOR_CATALOG:
+            await self.conn.execute(
+                "INSERT INTO color_catalog (manufacturer, color_name, hex_color, material, is_default) VALUES (?, ?, ?, ?, 1)",
+                (manufacturer, color_name, hex_color, material),
+            )
+        await self.conn.commit()
+
+    async def lookup_color(self, manufacturer: str, color_name: str, material: str | None = None) -> dict | None:
+        """Look up a color by manufacturer and color name, optionally filtering by material."""
+        if material:
+            async with self.conn.execute(
+                "SELECT id, manufacturer, color_name, hex_color, material, is_default, created_at FROM color_catalog WHERE manufacturer = ? AND color_name = ? AND material = ?",
+                (manufacturer, color_name, material),
+            ) as cursor:
+                row = await cursor.fetchone()
+                return dict(row) if row else None
+        else:
+            async with self.conn.execute(
+                "SELECT id, manufacturer, color_name, hex_color, material, is_default, created_at FROM color_catalog WHERE manufacturer = ? AND color_name = ? LIMIT 1",
+                (manufacturer, color_name),
+            ) as cursor:
+                row = await cursor.fetchone()
+                return dict(row) if row else None
 
     # ============ AMS Sensor History Operations ============
 

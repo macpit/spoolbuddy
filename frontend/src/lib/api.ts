@@ -267,6 +267,30 @@ export interface CatalogEntryInput {
   weight: number;
 }
 
+// Color catalog types
+export interface ColorEntry {
+  id: number;
+  manufacturer: string;
+  color_name: string;
+  hex_color: string;
+  material: string | null;
+  is_default: boolean;
+  created_at: number | null;
+}
+
+export interface ColorEntryInput {
+  manufacturer: string;
+  color_name: string;
+  hex_color: string;
+  material?: string | null;
+}
+
+export interface ColorLookupResult {
+  found: boolean;
+  hex_color: string | null;
+  material: string | null;
+}
+
 // AMS History types
 export interface AMSHistoryPoint {
   recorded_at: number;
@@ -792,6 +816,45 @@ class ApiClient {
     return this.request<void>("/catalog/reset", {
       method: "POST",
     });
+  }
+
+  // Color Catalog API
+  async getColorCatalog(): Promise<ColorEntry[]> {
+    return this.request<ColorEntry[]>("/colors");
+  }
+
+  async addColorEntry(entry: ColorEntryInput): Promise<ColorEntry> {
+    return this.request<ColorEntry>("/colors", {
+      method: "POST",
+      body: JSON.stringify(entry),
+    });
+  }
+
+  async updateColorEntry(id: number, entry: ColorEntryInput): Promise<ColorEntry> {
+    return this.request<ColorEntry>(`/colors/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(entry),
+    });
+  }
+
+  async deleteColorEntry(id: number): Promise<void> {
+    return this.request<void>(`/colors/${id}`, {
+      method: "DELETE",
+    });
+  }
+
+  async resetColorCatalog(): Promise<void> {
+    return this.request<void>("/colors/reset", {
+      method: "POST",
+    });
+  }
+
+  // Note: syncColorCatalog uses SSE streaming, called directly via fetch in ColorCatalogSettings
+
+  async lookupColor(manufacturer: string, colorName: string, material?: string): Promise<ColorLookupResult> {
+    const params = new URLSearchParams({ manufacturer, color_name: colorName });
+    if (material) params.append("material", material);
+    return this.request<ColorLookupResult>(`/colors/lookup?${params.toString()}`);
   }
 
   // AMS History API

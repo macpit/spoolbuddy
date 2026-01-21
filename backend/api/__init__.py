@@ -1,4 +1,5 @@
 from .catalog import router as catalog_router
+from .colors import router as colors_router
 from .device import router as device_router
 from .discovery import router as discovery_router
 from .firmware import router as firmware_router
@@ -19,5 +20,6 @@ __all__ = [
     "serial_router",
     "discovery_router",
     "catalog_router",
+    "colors_router",
     "support_router",
 ]

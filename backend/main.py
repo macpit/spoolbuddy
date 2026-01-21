@@ -9,6 +9,7 @@ from pathlib import Path
 
 from api import (
     catalog_router,
+    colors_router,
     device_router,
     discovery_router,
     firmware_router,
@@ -737,6 +738,7 @@ app.include_router(device_router, prefix="/api")
 app.include_router(serial_router, prefix="/api")
 app.include_router(discovery_router, prefix="/api")
 app.include_router(catalog_router, prefix="/api")
+app.include_router(colors_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
 app.include_router(support_router, prefix="/api")
 

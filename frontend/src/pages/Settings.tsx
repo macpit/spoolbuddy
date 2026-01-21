@@ -6,22 +6,14 @@ import { Cloud, CloudOff, LogOut, Loader2, Mail, Lock, Key, Download, RefreshCw,
 import { useToast } from "../lib/toast";
 import { SerialTerminal } from "../components/SerialTerminal";
 import { SpoolCatalogSettings } from "../components/SpoolCatalogSettings";
+import { ColorCatalogSettings } from "../components/ColorCatalogSettings";
 import { useTheme, type ThemeStyle, type DarkBackground, type LightBackground, type ThemeAccent } from "../lib/theme";
 
 // Storage keys for dashboard settings
-const SPOOL_DISPLAY_DURATION_KEY = 'spoolbuddy-spool-display-duration';
 const DEFAULT_CORE_WEIGHT_KEY = 'spoolbuddy-default-core-weight';
 
 function DashboardSettings() {
   const { showToast } = useToast();
-  const [spoolDisplayDuration, setSpoolDisplayDuration] = useState<number>(() => {
-    const stored = localStorage.getItem(SPOOL_DISPLAY_DURATION_KEY);
-    if (stored) {
-      const val = parseInt(stored, 10);
-      if (val >= 0 && val <= 300) return val;
-    }
-    return 10; // Default 10 seconds
-  });
 
   const [defaultCoreWeight, setDefaultCoreWeight] = useState<number>(() => {
     const stored = localStorage.getItem(DEFAULT_CORE_WEIGHT_KEY);
@@ -31,12 +23,6 @@ function DashboardSettings() {
     }
     return 250; // Default 250g (typical Bambu spool core)
   });
-
-  const handleDurationChange = (value: number) => {
-    setSpoolDisplayDuration(value);
-    localStorage.setItem(SPOOL_DISPLAY_DURATION_KEY, String(value));
-    showToast('success', `Spool display duration set to ${value}s`);
-  };
 
   const handleCoreWeightChange = (value: number) => {
     setDefaultCoreWeight(value);
@@ -54,31 +40,6 @@ function DashboardSettings() {
       </div>
       <div class="p-6 space-y-4">
         <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium text-[var(--text-primary)]">Spool Display Duration</p>
-            <p class="text-xs text-[var(--text-muted)]">
-              How long to show spool info after removing from scale
-            </p>
-          </div>
-          <div class="flex items-center gap-2">
-            <select
-              value={spoolDisplayDuration}
-              onChange={(e) => handleDurationChange(parseInt((e.target as HTMLSelectElement).value, 10))}
-              class="px-3 py-1.5 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
-            >
-              <option value="0">Immediately hide</option>
-              <option value="5">5 seconds</option>
-              <option value="10">10 seconds</option>
-              <option value="15">15 seconds</option>
-              <option value="30">30 seconds</option>
-              <option value="60">1 minute</option>
-              <option value="120">2 minutes</option>
-              <option value="300">5 minutes</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="flex items-center justify-between pt-4 border-t border-[var(--border-color)]">
           <div>
             <p class="text-sm font-medium text-[var(--text-primary)]">Default Core Weight</p>
             <p class="text-xs text-[var(--text-muted)]">
@@ -1342,23 +1303,25 @@ export function Settings() {
 
         {/* ============ FILAMENT TAB ============ */}
         {activeTab === 'filament' && (
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left Column */}
-            <div class="space-y-6">
-              {/* Dashboard settings */}
+          <div class="space-y-6">
+            {/* Top row - Dashboard and AMS settings */}
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div id="dashboard" class="scroll-mt-20">
                 <DashboardSettings />
               </div>
-
-              {/* AMS Settings */}
               <div id="ams" class="scroll-mt-20">
                 <AMSSettings />
               </div>
             </div>
 
-            {/* Right Column - Spool Catalog */}
+            {/* Full width - Spool Catalog */}
             <div id="catalog" class="scroll-mt-20">
               <SpoolCatalogSettings />
+            </div>
+
+            {/* Full width - Color Catalog */}
+            <div id="colors" class="scroll-mt-20">
+              <ColorCatalogSettings />
             </div>
           </div>
         )}
