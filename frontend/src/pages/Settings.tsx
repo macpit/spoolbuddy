@@ -439,32 +439,43 @@ export function Settings() {
 
   // Handle hash navigation and switch to correct tab
   useEffect(() => {
-    if (window.location.hash) {
-      const id = window.location.hash.slice(1);
-      // Map section IDs to tabs
-      const sectionToTab: Record<string, SettingsTab> = {
-        'updates': 'system',
-        'firmware': 'system',
-        'device': 'system',
-        'appearance': 'general',
-        'cloud': 'general',
-        'about': 'general',
-        'dashboard': 'filament',
-        'catalog': 'filament',
-        'system-info': 'support',
-        'logs': 'support',
-        'debug': 'support',
-      };
-      if (sectionToTab[id]) {
-        setActiveTab(sectionToTab[id]);
-      }
-      setTimeout(() => {
-        const el = document.getElementById(id);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const sectionToTab: Record<string, SettingsTab> = {
+      'updates': 'system',
+      'firmware': 'system',
+      'device': 'system',
+      'appearance': 'general',
+      'cloud': 'general',
+      'about': 'general',
+      'dashboard': 'filament',
+      'catalog': 'filament',
+      'colors': 'filament',
+      'system-info': 'support',
+      'logs': 'support',
+      'debug': 'support',
+      'api-keys': 'api',
+    };
+
+    const handleHashChange = () => {
+      if (window.location.hash) {
+        const id = window.location.hash.slice(1);
+        if (sectionToTab[id]) {
+          setActiveTab(sectionToTab[id]);
         }
-      }, 100);
-    }
+        setTimeout(() => {
+          const el = document.getElementById(id);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 100);
+      }
+    };
+
+    // Handle initial hash on mount
+    handleHashChange();
+
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
   // Fetch cloud status on mount

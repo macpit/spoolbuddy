@@ -54,9 +54,20 @@ export function Layout({ children }: LayoutProps) {
                 </span>
               )}
             </div>
-            <Link href="/settings#debug" class="text-sm font-medium hover:underline">
+            <a
+              href="/settings#debug"
+              class="text-sm font-medium hover:underline"
+              onClick={(e) => {
+                // If already on settings page, need to force hash change
+                if (location === '/settings' || location.startsWith('/settings#')) {
+                  e.preventDefault();
+                  window.location.hash = 'debug';
+                  window.dispatchEvent(new HashChangeEvent('hashchange'));
+                }
+              }}
+            >
               Manage →
-            </Link>
+            </a>
           </div>
         </div>
       )}
