@@ -446,7 +446,8 @@ export function SpoolsTable({
     )
 
     // Filter and order based on config
-    const result: ColumnDef<Spool, unknown>[] = []
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result: ColumnDef<Spool, any>[] = []
     for (const cfg of columnConfig) {
       if (cfg.visible) {
         const col = columnDefsMap.get(cfg.id)
