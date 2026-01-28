@@ -247,7 +247,7 @@ Open an issue and include:
 
 - Check the [Documentation](https://wiki.spoolbuddy.cool)
 - Open a [Discussion](https://github.com/maziggy/spoolbuddy/discussions)
-- Join our [Discord](https://discord.gg/aFS3ZfScHM)
+- Join our [Discord](https://discord.gg/3XFdHBkF)
 - Review existing [Issues](https://github.com/maziggy/spoolbuddy/issues)
 
 ---

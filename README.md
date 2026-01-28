@@ -13,7 +13,7 @@
   <a href="https://github.com/maziggy/spoolbuddy/blob/main/LICENSE"><img src="https://img.shields.io/github/license/maziggy/spoolbuddy?style=flat-square" alt="License"></a>
   <a href="https://github.com/maziggy/spoolbuddy/stargazers"><img src="https://img.shields.io/github/stars/maziggy/spoolbuddy?style=flat-square" alt="Stars"></a>
   <a href="https://github.com/maziggy/spoolbuddy/issues"><img src="https://img.shields.io/github/issues/maziggy/spoolbuddy?style=flat-square" alt="Issues"></a>
-  <a href="https://discord.gg/aFS3ZfScHM"><img src="https://img.shields.io/discord/1461241694715645994?style=flat-square&logo=discord&logoColor=white&label=Discord&color=5865F2" alt="Discord"></a>
+  <a href="https://discord.gg/3XFdHBkF"><img src="https://img.shields.io/discord/1464629928199847946?style=flat-square&logo=discord&logoColor=white&label=Discord&color=5865F2" alt="Discord"></a>
   <a href="https://ko-fi.com/maziggy"><img src="https://img.shields.io/badge/Ko--fi-Support-ff5e5b?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
 </p>
 
@@ -23,7 +23,7 @@
   <a href="#-quick-start">Quick Start</a> •
   <a href="https://wiki.spoolbuddy.cool">Documentation</a> •
   <a href="#-contributing">Contributing</a> •
-  <a href="https://discord.gg/aFS3ZfScHM">Discord</a>
+  <a href="https://discord.gg/3XFdHBkF">Discord</a>
 </p>
 
 ---
@@ -261,7 +261,7 @@ If you like SpoolBuddy and want to support it, you can <a href="https://ko-fi.co
 <p align="center">
   Made with ❤️ for the 3D printing community
   <br><br>
-  <a href="https://discord.gg/aFS3ZfScHM">Join our Discord</a> •
+  <a href="https://discord.gg/3XFdHBkF">Join our Discord</a> •
   <a href="https://github.com/maziggy/spoolbuddy/issues">Report Bug</a> •
   <a href="https://github.com/maziggy/spoolbuddy/issues">Request Feature</a> •
   <a href="https://wiki.spoolbuddy.cool">Documentation</a>
