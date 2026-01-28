@@ -12,7 +12,7 @@
 //!   - 0x20: Read tag data (returns: status, tag_type, uid_len, uid, block_data...)
 
 use esp_idf_hal::i2c::I2cDriver;
-use log::{info, warn};
+use log::{debug, info, warn};
 use std::sync::atomic::{AtomicU8, Ordering};
 
 /// I2C address of the Pico NFC bridge
@@ -168,10 +168,11 @@ pub fn scan_tag(i2c: &mut I2cDriver<'_>, state: &mut NfcBridgeState) -> Result<b
         state.tag_uid_len = uid_len;
         state.tag_uid[..uid_len as usize].copy_from_slice(&resp[2..2 + uid_len as usize]);
 
-        info!("[#{}] Tag found: {:02X?}", seq, &state.tag_uid[..uid_len as usize]);
+        // Tag detected - no sensitive data logged
+        debug!("[#{}] Tag detected", seq);
         Ok(true)
     } else {
-        info!("[#{}] Invalid UID len: {}", seq, uid_len);
+        debug!("[#{}] No valid tag", seq);
         state.tag_present = false;
         state.tag_uid_len = 0;
         state.decoded_info = None;
@@ -224,7 +225,7 @@ pub fn read_tag_data(i2c: &mut I2cDriver<'_>, state: &mut NfcBridgeState) -> Res
     let uid_len = resp[2] as usize;
     state.tag_type = tag_type;
 
-    info!("[#{}] Success! type={}, uid_len={}", seq, tag_type, uid_len);
+    debug!("[#{}] Tag read success", seq);
 
     // Decode based on tag type
     let data_offset = 3 + uid_len;
