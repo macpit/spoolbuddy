@@ -71,7 +71,8 @@ pub fn poll_nfc() {
                                 if found && !LAST_TAG_PRESENT {
                                     // Tag just appeared
                                     uid_hex = get_uid_hex_string(state);
-                                    info!("NFC TAG DETECTED: {}", uid_hex);
+                                    // Log detection without full UID (security: avoid logging sensitive tag identifiers)
+                                    info!("NFC TAG DETECTED");
                                     TAG_DATA_READ = false;
                                     tag_just_appeared = true;
                                 }
