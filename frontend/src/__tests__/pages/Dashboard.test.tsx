@@ -46,27 +46,28 @@ describe('Dashboard', () => {
       expect(screen.getByText('Current Spool')).toBeInTheDocument()
     })
 
-    it('shows empty state when no tag detected', async () => {
+    it('shows offline state when device is disconnected', async () => {
+      // Default test state has device disconnected
       renderWithProviders(<Dashboard />)
 
       await waitFor(() => {
-        expect(screen.getByText('Place a spool on the scale to identify it')).toBeInTheDocument()
+        expect(screen.getByText('Device Offline')).toBeInTheDocument()
       })
     })
 
-    it('shows "Ready to scan" text in empty state', async () => {
+    it('shows connection hint when device is offline', async () => {
       renderWithProviders(<Dashboard />)
 
       await waitFor(() => {
-        expect(screen.getByText('Ready to scan')).toBeInTheDocument()
+        expect(screen.getByText('Connect the SpoolBuddy display to scan spools')).toBeInTheDocument()
       })
     })
 
-    it('shows NFC hint in empty state', async () => {
+    it('shows waiting message when device is offline', async () => {
       renderWithProviders(<Dashboard />)
 
       await waitFor(() => {
-        expect(screen.getByText('NFC tag will be read automatically')).toBeInTheDocument()
+        expect(screen.getByText('Waiting for device connection...')).toBeInTheDocument()
       })
     })
   })

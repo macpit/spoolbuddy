@@ -25,6 +25,40 @@ const SPOOL_COLORS = [
   '#22C55E', // Lime
 ];
 
+// Offline state component when device is disconnected
+function DeviceOfflineState() {
+  return (
+    <div class="flex flex-col items-center text-center">
+      {/* Offline icon */}
+      <div class="relative mb-6 flex items-center justify-center" style={{ width: 160, height: 160 }}>
+        <div class="w-24 h-24 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center">
+          <svg class="w-12 h-12 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.364 5.636a9 9 0 010 12.728m0 0l-12.728-12.728m12.728 12.728L5.636 5.636m12.728 0a9 9 0 00-12.728 0m0 12.728a9 9 0 010-12.728" />
+          </svg>
+        </div>
+      </div>
+
+      {/* Text content */}
+      <div class="space-y-2">
+        <p class="text-lg font-medium text-[var(--text-muted)]">
+          Device Offline
+        </p>
+        <p class="text-sm text-[var(--text-muted)]">
+          Connect the SpoolBuddy display to scan spools
+        </p>
+      </div>
+
+      {/* Hint */}
+      <div class="mt-6 flex items-center gap-2 text-xs text-[var(--text-muted)]/60">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.14 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+        </svg>
+        <span>Waiting for device connection...</span>
+      </div>
+    </div>
+  );
+}
+
 // Empty state component with color-cycling spool
 function ColorCyclingSpool() {
   const [colorIndex, setColorIndex] = useState(0);
@@ -192,11 +226,13 @@ export function Dashboard() {
     if (weightToSync === null) return;
     try {
       await api.setSpoolWeight(spool.id, weightToSync);
-      // Reset weight tracking to allow fresh comparison
-      setWeightUpdatedForSpool(null);
       // Update displayed weight to match synced weight
       setDisplayedWeight(weightToSync);
-      await loadSpools();
+      // Refresh spools list first, then mark as updated to prevent effect from triggering
+      const freshSpools = await api.listSpools();
+      setSpools(freshSpools);
+      // Mark as updated AFTER spools refresh to prevent race with automatic update effect
+      setWeightUpdatedForSpool(spool.id);
       showToast('success', `Synced weight for ${spool.brand || ''} ${spool.material}`);
     } catch (e) {
       showToast('error', e instanceof Error ? e.message : 'Failed to sync weight');
@@ -214,29 +250,24 @@ export function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayedSpool?.id]);
 
-  // Update spool weight in backend when known spool is detected on scale
+  // Update spool weight in backend ONCE when a known spool is first detected on scale
+  // This syncs the database with the scale reading, but doesn't trigger on every weight change
   useEffect(() => {
-    // Only update weight once per spool detection, when weight is stable and tag is currently on scale
-    if (displayedSpool && currentTagId && currentWeight !== null && weightStable && weightUpdatedForSpool !== displayedSpool.id) {
-      const newWeight = Math.round(Math.max(0, currentWeight));
-      // Only update if weight is different (any change counts)
-      if (displayedSpool.weight_current === null || displayedSpool.weight_current !== newWeight) {
-        // Use setSpoolWeight to properly sync and reset consumed_since_weight
+    // Only run once per spool detection session, when weight is stable
+    if (displayedSpool && currentTagId && weightStable && weightUpdatedForSpool !== displayedSpool.id) {
+      // Mark as updated immediately to prevent duplicate calls
+      setWeightUpdatedForSpool(displayedSpool.id);
+
+      const newWeight = currentWeight !== null ? Math.round(Math.max(0, currentWeight)) : null;
+      if (newWeight !== null && (displayedSpool.weight_current === null || displayedSpool.weight_current !== newWeight)) {
+        // Update backend silently - UI already shows live weight
         api.setSpoolWeight(displayedSpool.id, newWeight)
-          .then(() => {
-            // Mark as updated to prevent duplicate updates
-            setWeightUpdatedForSpool(displayedSpool.id);
-            // Refresh spools list to keep it in sync
-            loadSpools();
-          })
           .catch(err => console.error('Failed to update spool weight:', err));
-      } else {
-        // Weight is same, just mark as processed
-        setWeightUpdatedForSpool(displayedSpool.id);
       }
     }
+    // Only depend on spool ID and tag ID - NOT currentWeight to avoid loops
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displayedSpool?.id, currentTagId, currentWeight, weightStable, weightUpdatedForSpool]);
+  }, [displayedSpool?.id, currentTagId, weightStable]);
 
   const loadCloudStatus = async () => {
     try {
@@ -543,13 +574,17 @@ export function Dashboard() {
               displayedSpool ? (
                 // Known spool from inventory
                 (() => {
-                  // Always use live scale weight when tag is on scale, fall back to stored weight_current
-                  const isTagOnScale = currentTagId === displayedTagId && currentWeight !== null;
-                  const liveWeight = isTagOnScale ? Math.round(Math.max(0, currentWeight)) : null;
+                  // Use live scale weight when tag is detected OR when tag flickers off but card is still showing
+                  // This prevents weight bouncing when NFC detection is unstable
+                  const useScaleWeight = currentWeight !== null &&
+                    (currentTagId === displayedTagId || (currentTagId === null && displayedTagId !== null));
+                  const liveWeight = useScaleWeight ? Math.round(Math.max(0, currentWeight)) : null;
                   const storedWeight = displayedSpool.weight_current;
                   const grossWeight = liveWeight ?? storedWeight ?? displayedWeight;
-                  // Always use Default Core Weight from settings for dashboard calculation
-                  const coreWeight = getDefaultCoreWeight();
+                  // Use spool's core_weight if set, otherwise fall back to default (matches backend calculation)
+                  const coreWeight = (displayedSpool.core_weight && displayedSpool.core_weight > 0)
+                    ? displayedSpool.core_weight
+                    : getDefaultCoreWeight();
                   const remaining = grossWeight !== null
                     ? Math.round(Math.max(0, grossWeight - coreWeight))
                     : null;
@@ -729,8 +764,10 @@ export function Dashboard() {
                 // Unknown tag - not in inventory
                 (() => {
                   const defaultCoreWeight = getDefaultCoreWeight();
-                  // Prefer live weight when tag is on scale, fall back to stored weight when removed
-                  const grossWeight = (currentTagId === displayedTagId && currentWeight !== null)
+                  // Prefer live weight when tag is on scale or flickering, fall back to stored weight
+                  const useScaleWeight = currentWeight !== null &&
+                    (currentTagId === displayedTagId || (currentTagId === null && displayedTagId !== null));
+                  const grossWeight = useScaleWeight
                     ? Math.round(Math.max(0, currentWeight))
                     : displayedWeight;
                   const estimatedRemaining = grossWeight !== null
@@ -789,8 +826,8 @@ export function Dashboard() {
                 })()
               )
             ) : (
-              // No tag - empty state with color-cycling spool
-              <ColorCyclingSpool />
+              // No tag - show offline or ready state
+              deviceConnected ? <ColorCyclingSpool /> : <DeviceOfflineState />
             )}
             </div>
           </div>
