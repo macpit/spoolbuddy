@@ -621,24 +621,41 @@ def on_tray_reading_change(serial: str, old_bits: int | None, new_bits: int):
 
 
 async def auto_connect_printers():
-    """Connect to printers with auto_connect enabled."""
+    """Periodically connect to printers with auto_connect enabled.
+
+    Runs every 30 seconds, attempting to connect printers that:
+    - Have auto_connect enabled
+    - Have valid ip_address and access_code
+    - Are not currently connected
+    """
     await asyncio.sleep(0.5)  # Wait for startup
 
-    db = await get_db()
-    printers = await db.get_auto_connect_printers()
+    while True:
+        try:
+            db = await get_db()
+            printers = await db.get_auto_connect_printers()
 
-    for printer in printers:
-        if printer.ip_address and printer.access_code:
-            logger.info(f"Auto-connecting to printer {printer.serial}")
-            try:
-                await printer_manager.connect(
-                    serial=printer.serial,
-                    ip_address=printer.ip_address,
-                    access_code=printer.access_code,
-                    name=printer.name,
-                )
-            except Exception as e:
-                logger.error(f"Failed to auto-connect to {printer.serial}: {e}")
+            for printer in printers:
+                if printer.ip_address and printer.access_code:
+                    # Skip if already connected
+                    if printer_manager.is_connected(printer.serial):
+                        continue
+
+                    logger.info(f"Auto-connecting to printer {printer.serial}")
+                    try:
+                        await printer_manager.connect(
+                            serial=printer.serial,
+                            ip_address=printer.ip_address,
+                            access_code=printer.access_code,
+                            name=printer.name,
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to auto-connect to {printer.serial}: {e}")
+        except Exception as e:
+            logger.error(f"Error in auto-connect loop: {e}")
+
+        # Wait before next check
+        await asyncio.sleep(30)
 
 
 @asynccontextmanager
