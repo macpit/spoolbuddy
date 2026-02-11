@@ -10,6 +10,9 @@
 
 <p align="center">
   <a href="https://github.com/maziggy/spoolbuddy/releases"><img src="https://img.shields.io/github/v/release/maziggy/spoolbuddy?style=flat-square&color=blue" alt="Release"></a>
+  <img src="https://github.com/maziggy/spoolbuddy/actions/workflows/ci.yml/badge.svg?branch=main">
+  <img src="https://github.com/maziggy/spoolbuddy/actions/workflows/github-code-scanning/codeql/badge.svg">
+  <img src="https://github.com/maziggy/spoolbuddy/actions/workflows/security.yml/badge.svg">
   <a href="https://github.com/maziggy/spoolbuddy/blob/main/LICENSE"><img src="https://img.shields.io/github/license/maziggy/spoolbuddy?style=flat-square" alt="License"></a>
   <a href="https://github.com/maziggy/spoolbuddy/stargazers"><img src="https://img.shields.io/github/stars/maziggy/spoolbuddy?style=flat-square" alt="Stars"></a>
   <a href="https://github.com/maziggy/spoolbuddy/issues"><img src="https://img.shields.io/github/issues/maziggy/spoolbuddy?style=flat-square" alt="Issues"></a>
@@ -134,7 +137,19 @@ See the [Hardware](https://wiki.spoolbuddy.cool/getting-started/hardware/) page 
 - Bambu Lab printer with **Developer Mode** enabled
 - SpoolBuddy hardware device
 
-### Backend Installation
+### Docker (Recommended)
+
+```bash
+mkdir spoolbuddy && cd spoolbuddy
+curl -O https://raw.githubusercontent.com/maziggy/spoolbuddy/main/docker-compose.yml
+docker compose up -d
+```
+
+Open **http://localhost:3000** in your browser.
+
+> **Multi-architecture support:** Pre-built images are available for `linux/amd64` and `linux/arm64` (Raspberry Pi 4/5).
+
+### Manual Installation
 
 ```bash
 # Clone repository

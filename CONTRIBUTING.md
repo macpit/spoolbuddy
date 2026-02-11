@@ -10,6 +10,7 @@ Thank you for your interest in contributing to SpoolBuddy! This document provide
 - [Making Changes](#making-changes)
 - [Code Style](#code-style)
 - [Testing](#testing)
+- [CI Pipeline](#ci-pipeline)
 - [Submitting Changes](#submitting-changes)
 - [Reporting Bugs](#reporting-bugs)
 - [Requesting Features](#requesting-features)
@@ -169,6 +170,24 @@ pre-commit run --all-files
 
 ## Testing
 
+### Quick Test Scripts
+
+```bash
+# Run all tests (frontend + backend + docker)
+./test_all.sh
+
+# Individual test suites
+./test_frontend.sh          # TypeScript check + ESLint + Vitest
+./test_backend.sh           # Ruff lint + pytest
+./test_backend.sh --full    # Including slow tests
+./test_docker.sh            # Docker build + unit tests + integration
+./test_docker.sh --fresh    # Force rebuild (no cache)
+
+# Security scanning
+./test_security.sh          # Fast scans (bandit, pip-audit, npm-audit)
+./test_security.sh --full   # Full pipeline (+ CodeQL, Trivy)
+```
+
 ### Backend Tests
 
 ```bash
@@ -182,6 +201,9 @@ python -m pytest tests/ --cov=. --cov-report=html
 
 # Run specific test file
 python -m pytest tests/unit/test_example.py -v
+
+# Run with linting
+ruff check . && ruff format --check
 ```
 
 ### Frontend Tests
@@ -197,7 +219,50 @@ npm run test
 
 # Run with coverage
 npm run test:coverage
+
+# Type check
+npx tsc --noEmit
+
+# Lint
+npm run lint
 ```
+
+### Docker Tests
+
+```bash
+# Full Docker test suite
+./test_docker.sh
+
+# Individual stages
+./test_docker.sh --build-only        # Just build verification
+./test_docker.sh --backend-only      # Backend tests in Docker
+./test_docker.sh --frontend-only     # Frontend tests in Docker
+./test_docker.sh --integration-only  # Integration tests only
+./test_docker.sh --skip-integration  # Skip integration tests
+```
+
+## CI Pipeline
+
+When you open a pull request, the following checks run automatically:
+
+| Stage | What it does |
+|-------|-------------|
+| **Backend Lint** | Ruff check + format validation |
+| **Backend Security** | pip-audit dependency scan (non-blocking) |
+| **Backend Tests** | pytest with timeout (requires lint pass) |
+| **Frontend Lint** | ESLint validation |
+| **Frontend Security** | npm audit (non-blocking) |
+| **Frontend Type Check** | TypeScript strict checking |
+| **Frontend Tests** | Vitest (requires lint + typecheck) |
+| **Frontend Build** | Production build verification |
+| **Docker Build** | Full Docker build + integration tests |
+
+Additionally, these workflows run on schedule:
+- **CodeQL** — Weekly code scanning (Python, JavaScript/TypeScript, Actions)
+- **Security Audit** — Weekly Bandit SAST + Trivy container scan + dependency audits
+- **Stale Issues** — Auto-close inactive issues after 28 days
+
+All checks must pass before merging. Security scans are non-blocking (`continue-on-error`) but should be reviewed.
 
 ## Submitting Changes
 
