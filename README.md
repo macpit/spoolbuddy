@@ -14,15 +14,7 @@
   <a href="#-quick-start">Quick Start</a> •
   <a href="https://wiki.spoolbuddy.cool">Documentation</a> •
   <a href="#-contributing">Contributing</a> •
-  <a href="https://discord.gg/3XFdHBkF">Discord</a>
 </p>
-
----
-
-> [!CAUTION]
-> **This project is under heavy development and not yet ready for end users.**
->
-> Hardware designs, firmware, and software are actively being developed and may change significantly. Documentation may be incomplete or outdated. If you're interested in following the progress or contributing, join our [Discord](https://discord.gg/nedWfBE6)!
 
 ---
 
@@ -261,18 +253,3 @@ MIT License — see [LICENSE](LICENSE) for details.
 - [OpenSpool](https://github.com/spuder/OpenSpool) for NFC tag format inspiration
 - [Bambuddy](https://github.com/maziggy/bambuddy) for printer integration patterns
 - The reverse engineering community for protocol documentation
-
----
-
-If you like SpoolBuddy and want to support it, you can <a href="https://ko-fi.com/maziggy" target=_blank>buy Martin a coffee</a>.
-
----
-
-<p align="center">
-  Made with ❤️ for the 3D printing community
-  <br><br>
-  <a href="https://discord.gg/3XFdHBkF">Join our Discord</a> •
-  <a href="https://github.com/maziggy/spoolbuddy/issues">Report Bug</a> •
-  <a href="https://github.com/maziggy/spoolbuddy/issues">Request Feature</a> •
-  <a href="https://wiki.spoolbuddy.cool">Documentation</a>
-</p>
