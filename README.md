@@ -9,18 +9,6 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/maziggy/spoolbuddy/releases"><img src="https://img.shields.io/github/v/release/maziggy/spoolbuddy?style=flat-square&color=blue" alt="Release"></a>
-  <img src="https://github.com/maziggy/spoolbuddy/actions/workflows/ci.yml/badge.svg?branch=main">
-  <img src="https://github.com/maziggy/spoolbuddy/actions/workflows/github-code-scanning/codeql/badge.svg">
-  <img src="https://github.com/maziggy/spoolbuddy/actions/workflows/security.yml/badge.svg">
-  <a href="https://github.com/maziggy/spoolbuddy/blob/main/LICENSE"><img src="https://img.shields.io/github/license/maziggy/spoolbuddy?style=flat-square" alt="License"></a>
-  <a href="https://github.com/maziggy/spoolbuddy/stargazers"><img src="https://img.shields.io/github/stars/maziggy/spoolbuddy?style=flat-square" alt="Stars"></a>
-  <a href="https://github.com/maziggy/spoolbuddy/issues"><img src="https://img.shields.io/github/issues/maziggy/spoolbuddy?style=flat-square" alt="Issues"></a>
-  <a href="https://discord.gg/3XFdHBkF"><img src="https://img.shields.io/discord/1464629928199847946?style=flat-square&logo=discord&logoColor=white&label=Discord&color=5865F2" alt="Discord"></a>
-  <a href="https://ko-fi.com/maziggy"><img src="https://img.shields.io/badge/Ko--fi-Support-ff5e5b?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
-</p>
-
-<p align="center">
   <a href="#-features">Features</a> •
   <a href="#-hardware">Hardware</a> •
   <a href="#-quick-start">Quick Start</a> •
