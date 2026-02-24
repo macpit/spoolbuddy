@@ -4,10 +4,6 @@
 
 No cloud dependency. Complete privacy. Full control.
 
-[![GitHub](https://img.shields.io/github/stars/maziggy/spoolbuddy?style=flat-square&label=GitHub)](https://github.com/maziggy/spoolbuddy)
-[![License](https://img.shields.io/github/license/maziggy/spoolbuddy?style=flat-square)](https://github.com/maziggy/spoolbuddy/blob/main/LICENSE)
-[![Discord](https://img.shields.io/discord/1464629928199847946?style=flat-square&logo=discord&logoColor=white&label=Discord&color=5865F2)](https://discord.gg/3XFdHBkF)
-
 ## Quick Start
 
 ```bash
